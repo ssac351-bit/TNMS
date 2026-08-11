@@ -23,6 +23,7 @@ import {
   X
 } from 'lucide-react';
 import { db } from '../lib/firebase';
+import { saveToSupabase, deleteFromSupabase } from '../lib/supabase';
 import { 
   collection, 
   doc, 
@@ -259,16 +260,17 @@ export default function DocumentCenter({
         synced: false
       };
 
-      // 1. Save to cloud Firestore if online
+      // 1. Save to cloud Firestore and Supabase if online
       if (navigator.onLine) {
         try {
           const docRef = doc(db, 'RealDocuments', newDoc.id);
           const uploadPayload = { ...newDoc };
-          delete uploadPayload.synced; // Do not save sync metadata field to Firestore
+          delete uploadPayload.synced; // Do not save sync metadata field
           await setDoc(docRef, uploadPayload);
+          await saveToSupabase('RealDocuments', newDoc.id, uploadPayload);
           newDoc.synced = true;
         } catch (dbErr) {
-          console.warn('Firestore direct write failed, saving locally first:', dbErr);
+          console.warn('Direct cloud write failed, saving locally first:', dbErr);
           newDoc.synced = false;
         }
       }
@@ -331,6 +333,7 @@ export default function DocumentCenter({
           const uploadPayload = { ...d };
           delete uploadPayload.synced;
           await setDoc(docRef, uploadPayload);
+          await saveToSupabase('RealDocuments', d.id, uploadPayload);
           d.synced = true;
           successCount++;
         } catch (e) {
@@ -354,10 +357,11 @@ export default function DocumentCenter({
     if (!window.confirm(`আপনি কি নিশ্চিতভাবে "${docTitle}" দলিলটি মুছে ফেলতে চান?`)) return;
 
     try {
-      // 1. Delete from Firestore if online
+      // 1. Delete from Firestore & Supabase if online
       if (navigator.onLine) {
         try {
           await deleteDoc(doc(db, 'RealDocuments', docId));
+          await deleteFromSupabase('RealDocuments', docId);
         } catch (cloudErr) {
           console.warn('Could not delete from cloud:', cloudErr);
         }

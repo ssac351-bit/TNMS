@@ -13,6 +13,7 @@ import StaffDashboard from './components/StaffDashboard';
 import MemberDashboard from './components/MemberDashboard';
 import { db } from './lib/firebase';
 import { collection, getDocs, doc, setDoc, deleteDoc, getDocFromServer } from 'firebase/firestore';
+import { saveToSupabase, deleteFromSupabase } from './lib/supabase';
 
 export default function App() {
   // Authentication states
@@ -142,12 +143,14 @@ export default function App() {
       try {
         for (const org of deleted) {
           await deleteDoc(doc(db, 'Organizations', org.id));
+          await deleteFromSupabase('Organizations', org.id);
         }
         for (const org of savedOrUpd) {
           await setDoc(doc(db, 'Organizations', org.id), org);
+          await saveToSupabase('Organizations', org.id, org);
         }
       } catch (err) {
-        console.warn("Error syncing organizations to Firestore:", err);
+        console.warn("Error syncing organizations to Firestore/Supabase:", err);
       }
     }
 

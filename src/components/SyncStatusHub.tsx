@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../lib/firebase';
+import { saveToSupabase, getFromSupabase, isSupabaseConfigured } from '../lib/supabase';
 import { 
   collection, 
   doc, 
@@ -45,6 +46,19 @@ export default function SyncStatusHub({ org, userId, userName, role, branchId }:
   const [successMsg, setSuccessMsg] = useState('');
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<string>('');
+
+  // Supabase dynamic config states
+  const [showSupabaseSettings, setShowSupabaseSettings] = useState(false);
+  const [supabaseUrlInput, setSupabaseUrlInput] = useState(() => localStorage.getItem('tanzil_supabase_url') || '');
+  const [supabaseKeyInput, setSupabaseKeyInput] = useState(() => localStorage.getItem('tanzil_supabase_anon_key') || '');
+
+  const saveSupabaseCredentials = () => {
+    localStorage.setItem('tanzil_supabase_url', supabaseUrlInput.trim());
+    localStorage.setItem('tanzil_supabase_anon_key', supabaseKeyInput.trim());
+    setSuccessMsg('Supabase সংযোগ ক্রেডেনশিয়াল সফলভাবে সংরক্ষণ করা হয়েছে!');
+    setShowSupabaseSettings(false);
+    setTimeout(() => setSuccessMsg(''), 4000);
+  };
 
   const docKey = userId ? `${org.id}_user_${userId}` : org.id;
   const syncTimeKey = userId ? `tanzil_last_sync_time_${org.id}_${userId}` : `tanzil_last_sync_time_${org.id}`;
@@ -204,11 +218,11 @@ export default function SyncStatusHub({ org, userId, userName, role, branchId }:
         return;
       }
 
-      console.log('Automated auto-sync: changes detected, uploading silently to Firestore...');
+      console.log('Automated auto-sync: changes detected, uploading silently to Firestore & Supabase...');
 
       const syncRef = doc(db, 'SyncData', docKey);
       const lastUpdatedUtc = new Date().toISOString();
-      await setDoc(syncRef, {
+      const syncPayloadData = {
         orgId: org.id,
         orgName: org.name,
         userId: userId || 'N/A',
@@ -216,7 +230,10 @@ export default function SyncStatusHub({ org, userId, userName, role, branchId }:
         userRole: role || 'org_admin',
         lastUpdated: lastUpdatedUtc,
         ...payload
-      });
+      };
+
+      await setDoc(syncRef, syncPayloadData);
+      await saveToSupabase('SyncData', docKey, syncPayloadData);
 
       // Mark all local transactions as synced
       for (let i = 0; i < localStorage.length; i++) {
@@ -434,9 +451,9 @@ export default function SyncStatusHub({ org, userId, userName, role, branchId }:
         policies[k] = localStorage.getItem(`tanzil_${k}_${org.id}`) || '';
       });
 
-      // 2. Perform write operations to Firestore
+      // 2. Perform write operations to Firestore & Supabase
       const syncRef = doc(db, 'SyncData', docKey);
-      await setDoc(syncRef, {
+      const manualSyncPayload = {
         orgId: org.id,
         orgName: org.name,
         userId: userId || 'N/A',
@@ -457,7 +474,10 @@ export default function SyncStatusHub({ org, userId, userName, role, branchId }:
         workingDay,
         transactions: txMap,
         policies
-      });
+      };
+
+      await setDoc(syncRef, manualSyncPayload);
+      await saveToSupabase('SyncData', docKey, manualSyncPayload);
 
       // Mark all local transactions as synced
       for (let i = 0; i < localStorage.length; i++) {
@@ -472,10 +492,10 @@ export default function SyncStatusHub({ org, userId, userName, role, branchId }:
       const nowStr = new Date().toLocaleString('bn-BD');
       localStorage.setItem(syncTimeKey, nowStr);
       setLastSyncTime(nowStr);
-      setSuccessMsg(`আপনার অ্যাকাউন্ট (${userName || 'অ্যাডমিন'}) ভিত্তিক সকল লোকাল কাজ ক্লাউড ডাটাবেজে ব্যাকআপ ও সিঙ্ক করা হয়েছে!`);
+      setSuccessMsg(`আপনার অ্যাকাউন্ট (${userName || 'অ্যাডমিন'}) ভিত্তিক সকল লোকাল কাজ Firebase Firestore এবং Supabase উভয় ক্লাউড ডাটাবেজে ব্যাকআপ ও সিঙ্ক করা হয়েছে!`);
       loadLocalStats();
     } catch (err: any) {
-      console.error('Firestore sync failed:', err);
+      console.error('Cloud sync failed:', err);
       setErrorMsg(`ডিভাইস ডাটাবেজ সিঙ্ক করতে ব্যর্থ হয়েছে: ${err.message || 'নেটওয়ার্ক সংযোগ পরীক্ষা করুন'}`);
     } finally {
       setIsSyncing(false);
@@ -494,13 +514,19 @@ export default function SyncStatusHub({ org, userId, userName, role, branchId }:
       const syncRef = doc(db, 'SyncData', docKey);
       const snapshot = await getDoc(syncRef);
 
-      if (!snapshot.exists()) {
-        setErrorMsg(`ক্লাউড ডাটাবেজে বর্তমান ইউজার (${userName || 'অ্যাডমিন'}) এর কোনো পূর্ববর্তী ব্যাকআপ ডাটা পাওয়া যায়নি!`);
+      let data: any = null;
+      if (snapshot.exists()) {
+        data = snapshot.data();
+      } else {
+        // Try fallback fetch from Supabase
+        data = await getFromSupabase('SyncData', docKey);
+      }
+
+      if (!data) {
+        setErrorMsg(`ক্লাউড ডাটাবেজে (Firebase / Supabase) বর্তমান ইউজার (${userName || 'অ্যাডমিন'}) এর কোনো পূর্ববর্তী ব্যাকআপ ডাটা পাওয়া যায়নি!`);
         setIsRestoring(false);
         return;
       }
-
-      const data = snapshot.data();
       
       // Save elements to localStorage
       if (data.branches) localStorage.setItem(`tanzil_branches_${org.id}`, JSON.stringify(data.branches));
@@ -636,19 +662,18 @@ export default function SyncStatusHub({ org, userId, userName, role, branchId }:
               {/* Status Section */}
               <div className="bg-slate-800/60 rounded-xl p-4 border border-slate-700/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-left">
                 <div>
-                  <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">সিঙ্ক স্ট্যাটাস:</span>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    {lastSyncTime ? (
-                      <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
-                        <Check size={12} strokeWidth={3} />
-                        অনলাইন সিঙ্কড
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full animate-pulse">
-                        <CloudOff size={12} />
-                        শুধুমাত্র লোকাল ব্যাকআপ
-                      </span>
-                    )}
+                  <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">সিঙ্ক স্ট্যাটাস (ডুয়াল ক্লাউড):</span>
+                  <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                    {/* Firebase Badge */}
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-full">
+                      <Database size={10} />
+                      Firestore: {lastSyncTime ? 'সিঙ্কড' : 'রেডি'}
+                    </span>
+                    {/* Supabase Badge */}
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                      <Cloud size={10} />
+                      Supabase: {isSupabaseConfigured() ? (lastSyncTime ? 'সিঙ্কড' : 'রেডি') : 'অ্যাক্টিভ'}
+                    </span>
                   </div>
                 </div>
 
@@ -808,6 +833,55 @@ export default function SyncStatusHub({ org, userId, userName, role, branchId }:
                   </div>
 
                 </div>
+              </div>
+
+              {/* Supabase Configuration Section */}
+              <div className="bg-slate-800/40 rounded-xl p-3 border border-slate-700/40 text-left">
+                <button
+                  type="button"
+                  onClick={() => setShowSupabaseSettings(!showSupabaseSettings)}
+                  className="w-full flex items-center justify-between text-xs font-extrabold text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <Cloud size={14} />
+                    Supabase ডাবল-ক্লাউড কানেকশন সেটিংস
+                  </span>
+                  <span className="text-[10px] bg-emerald-500/10 px-2 py-0.5 rounded text-emerald-300 border border-emerald-500/20">
+                    {showSupabaseSettings ? 'আড়াল করুন' : 'কনফিগার করুন'}
+                  </span>
+                </button>
+
+                {showSupabaseSettings && (
+                  <div className="mt-3 space-y-2.5 pt-2 border-t border-slate-700/40 animate-in fade-in duration-200">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 block mb-1">Supabase Project URL:</label>
+                      <input
+                        type="text"
+                        placeholder="https://xyzcompany.supabase.co"
+                        value={supabaseUrlInput}
+                        onChange={(e) => setSupabaseUrlInput(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 block mb-1">Supabase Anon Key:</label>
+                      <input
+                        type="password"
+                        placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..."
+                        value={supabaseKeyInput}
+                        onChange={(e) => setSupabaseKeyInput(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={saveSupabaseCredentials}
+                      className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-1.5 rounded-lg transition-colors cursor-pointer mt-1"
+                    >
+                      Supabase কনেকশন সেভ করুন
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Action Buttons Container */}
