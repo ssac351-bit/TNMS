@@ -120,3 +120,51 @@ export async function getFromSupabase(table: string, id?: string): Promise<any> 
     return null;
   }
 }
+
+/**
+ * Diagnostic tool to verify Supabase connection
+ */
+export async function testSupabaseConnection(): Promise<{ success: boolean; message: string }> {
+  const cfg = getStoredSupabaseConfig();
+  if (!cfg.url || cfg.url === 'https://placeholder-project.supabase.co') {
+    return {
+      success: false,
+      message: 'Supabase URL কনফিগার করা হয়নি! অনুগ্রহ করে "Supabase সেটিংস"-এ Project URL প্রদান করুন।'
+    };
+  }
+
+  const client = getSupabaseClient();
+  if (!client) {
+    return {
+      success: false,
+      message: 'Supabase ক্লায়েন্ট ইনিশিয়ালাইজেশন ব্যর্থ হয়েছে। URL এবং Anon Key সঠিক কিনা পরীক্ষা করুন।'
+    };
+  }
+
+  try {
+    // Try sending a test ping save
+    const testId = 'connection_test_ping';
+    const saved = await saveToSupabase('SyncData', testId, {
+      ping: 'ok',
+      time: new Date().toISOString()
+    });
+
+    if (saved) {
+      return {
+        success: true,
+        message: 'Supabase-এর সাথে সফলভাবে ডাটা আদান-প্রদান (Read/Write) নিশ্চিত করা হয়েছে!'
+      };
+    } else {
+      return {
+        success: false,
+        message: 'Supabase সার্ভারে কানেক্ট হওয়া গেলেও টেবিলে তথ্য লেখা যায়নি। Supabase Project-এ "SyncData", "Organizations", বা "RealDocuments" টেবিল তৈরি আছে কিনা ও RLS পারমিশন চেক করুন।'
+      };
+    }
+  } catch (err: any) {
+    return {
+      success: false,
+      message: `Supabase ত্রুটি: ${err.message || 'নেটওয়ার্ক সংযোগ পরীক্ষা করুন'}`
+    };
+  }
+}
+

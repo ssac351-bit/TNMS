@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../lib/firebase';
-import { saveToSupabase, getFromSupabase, isSupabaseConfigured } from '../lib/supabase';
+import { saveToSupabase, getFromSupabase, isSupabaseConfigured, testSupabaseConnection } from '../lib/supabase';
 import { 
   collection, 
   doc, 
@@ -26,7 +26,9 @@ import {
   Info, 
   Trash2,
   X,
-  User
+  User,
+  Copy,
+  Code
 } from 'lucide-react';
 import { Organization } from '../types';
 
@@ -51,6 +53,50 @@ export default function SyncStatusHub({ org, userId, userName, role, branchId }:
   const [showSupabaseSettings, setShowSupabaseSettings] = useState(false);
   const [supabaseUrlInput, setSupabaseUrlInput] = useState(() => localStorage.getItem('tanzil_supabase_url') || '');
   const [supabaseKeyInput, setSupabaseKeyInput] = useState(() => localStorage.getItem('tanzil_supabase_anon_key') || '');
+  const [isTestingSupabase, setIsTestingSupabase] = useState(false);
+  const [showSqlScript, setShowSqlScript] = useState(false);
+  const [copiedSql, setCopiedSql] = useState(false);
+
+  const supabaseSqlCode = `-- Tanzil App Supabase Auto Table Setup Script
+-- Paste this script into your Supabase Dashboard -> SQL Editor and click 'Run'
+
+CREATE TABLE IF NOT EXISTS "SyncData" (
+  id TEXT PRIMARY KEY,
+  data JSONB,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS "Organizations" (
+  id TEXT PRIMARY KEY,
+  data JSONB,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS "RealDocuments" (
+  id TEXT PRIMARY KEY,
+  data JSONB,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE "SyncData" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Organizations" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "RealDocuments" ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow_Public_SyncData" ON "SyncData";
+CREATE POLICY "Allow_Public_SyncData" ON "SyncData" FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow_Public_Organizations" ON "Organizations";
+CREATE POLICY "Allow_Public_Organizations" ON "Organizations" FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow_Public_RealDocuments" ON "RealDocuments";
+CREATE POLICY "Allow_Public_RealDocuments" ON "RealDocuments" FOR ALL USING (true) WITH CHECK (true);`;
+
+  const copySupabaseSql = () => {
+    navigator.clipboard.writeText(supabaseSqlCode);
+    setCopiedSql(true);
+    setSuccessMsg('Supabase SQL স্ক্রিপ্ট ক্লিপবোর্ডে কপি করা হয়েছে!');
+    setTimeout(() => setCopiedSql(false), 3000);
+  };
 
   const saveSupabaseCredentials = () => {
     localStorage.setItem('tanzil_supabase_url', supabaseUrlInput.trim());
@@ -58,6 +104,24 @@ export default function SyncStatusHub({ org, userId, userName, role, branchId }:
     setSuccessMsg('Supabase সংযোগ ক্রেডেনশিয়াল সফলভাবে সংরক্ষণ করা হয়েছে!');
     setShowSupabaseSettings(false);
     setTimeout(() => setSuccessMsg(''), 4000);
+  };
+
+  const handleTestSupabase = async () => {
+    setIsTestingSupabase(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+    try {
+      const res = await testSupabaseConnection();
+      if (res.success) {
+        setSuccessMsg(res.message);
+      } else {
+        setErrorMsg(res.message);
+      }
+    } catch (err: any) {
+      setErrorMsg(`Supabase টেস্ট ব্যর্থ: ${err.message || 'অজানা সমস্যা'}`);
+    } finally {
+      setIsTestingSupabase(false);
+    }
   };
 
   const docKey = userId ? `${org.id}_user_${userId}` : org.id;
@@ -873,13 +937,69 @@ export default function SyncStatusHub({ org, userId, userName, role, branchId }:
                         className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-emerald-500"
                       />
                     </div>
-                    <button
-                      type="button"
-                      onClick={saveSupabaseCredentials}
-                      className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-1.5 rounded-lg transition-colors cursor-pointer mt-1"
-                    >
-                      Supabase কনেকশন সেভ করুন
-                    </button>
+                    <div className="flex gap-2 mt-1">
+                      <button
+                        type="button"
+                        onClick={saveSupabaseCredentials}
+                        className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-1.5 rounded-lg transition-colors cursor-pointer"
+                      >
+                        কনেকশন সেভ করুন
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isTestingSupabase}
+                        onClick={handleTestSupabase}
+                        className="flex-1 bg-slate-700 hover:bg-slate-600 border border-slate-600 text-emerald-300 font-bold text-xs py-1.5 rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                      >
+                        {isTestingSupabase ? (
+                          <>
+                            <Loader2 size={12} className="animate-spin" />
+                            <span>টেস্ট করা হচ্ছে...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Check size={12} />
+                            <span>কানেকশন টেস্ট করুন</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {/* SQL Table Auto-Setup Assistant */}
+                    <div className="pt-2 border-t border-slate-700/50">
+                      <button
+                        type="button"
+                        onClick={() => setShowSqlScript(!showSqlScript)}
+                        className="w-full flex items-center justify-between text-[11px] font-bold text-indigo-300 hover:text-indigo-200 transition-colors py-1 cursor-pointer"
+                      >
+                        <span className="flex items-center gap-1">
+                          <Code size={12} />
+                          Supabase SQL টেবিল তৈরির কোড (Schema Fix)
+                        </span>
+                        <span className="text-[10px] text-indigo-400 underline">
+                          {showSqlScript ? 'লুকান' : 'দেখুন ও কপি করুন'}
+                        </span>
+                      </button>
+
+                      {showSqlScript && (
+                        <div className="mt-2 p-2 bg-slate-950 rounded-lg border border-slate-800 text-left animate-in fade-in">
+                          <div className="flex justify-between items-center mb-1.5">
+                            <span className="text-[10px] text-slate-400 font-bold">SQL Editor-এ রান করার জন্য কোড:</span>
+                            <button
+                              type="button"
+                              onClick={copySupabaseSql}
+                              className="inline-flex items-center gap-1 text-[10px] bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-2 py-0.5 rounded cursor-pointer transition-colors"
+                            >
+                              {copiedSql ? <Check size={10} /> : <Copy size={10} />}
+                              <span>{copiedSql ? 'কপি হয়েছে!' : 'কপি করুন'}</span>
+                            </button>
+                          </div>
+                          <pre className="text-[10px] text-emerald-400 font-mono bg-slate-900 p-2 rounded overflow-x-auto max-h-36 select-all border border-slate-800">
+                            {supabaseSqlCode}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
