@@ -78,18 +78,10 @@ CREATE TABLE IF NOT EXISTS "RealDocuments" (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-ALTER TABLE "SyncData" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "Organizations" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "RealDocuments" ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Allow_Public_SyncData" ON "SyncData";
-CREATE POLICY "Allow_Public_SyncData" ON "SyncData" FOR ALL USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Allow_Public_Organizations" ON "Organizations";
-CREATE POLICY "Allow_Public_Organizations" ON "Organizations" FOR ALL USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Allow_Public_RealDocuments" ON "RealDocuments";
-CREATE POLICY "Allow_Public_RealDocuments" ON "RealDocuments" FOR ALL USING (true) WITH CHECK (true);`;
+-- Disable Row Level Security (RLS) so App can read/write data freely
+ALTER TABLE "SyncData" DISABLE ROW LEVEL SECURITY;
+ALTER TABLE "Organizations" DISABLE ROW LEVEL SECURITY;
+ALTER TABLE "RealDocuments" DISABLE ROW LEVEL SECURITY;`;
 
   const copySupabaseSql = () => {
     navigator.clipboard.writeText(supabaseSqlCode);
@@ -541,7 +533,7 @@ CREATE POLICY "Allow_Public_RealDocuments" ON "RealDocuments" FOR ALL USING (tru
       };
 
       await setDoc(syncRef, manualSyncPayload);
-      await saveToSupabase('SyncData', docKey, manualSyncPayload);
+      const supabaseSuccess = await saveToSupabase('SyncData', docKey, manualSyncPayload);
 
       // Mark all local transactions as synced
       for (let i = 0; i < localStorage.length; i++) {
@@ -556,7 +548,14 @@ CREATE POLICY "Allow_Public_RealDocuments" ON "RealDocuments" FOR ALL USING (tru
       const nowStr = new Date().toLocaleString('bn-BD');
       localStorage.setItem(syncTimeKey, nowStr);
       setLastSyncTime(nowStr);
-      setSuccessMsg(`আপনার অ্যাকাউন্ট (${userName || 'অ্যাডমিন'}) ভিত্তিক সকল লোকাল কাজ Firebase Firestore এবং Supabase উভয় ক্লাউড ডাটাবেজে ব্যাকআপ ও সিঙ্ক করা হয়েছে!`);
+
+      if (supabaseSuccess) {
+        setSuccessMsg(`আপনার অ্যাকাউন্ট (${userName || 'অ্যাডমিন'}) ভিত্তিক সকল কাজ Firebase Firestore এবং Supabase উভয় ডাটাবেজে সফলভাবে ব্যাকআপ ও সেভ হয়েছে!`);
+      } else if (!isSupabaseConfigured()) {
+        setSuccessMsg(`Firebase Firestore-এ ডাটা সফলভাবে সেভ হয়েছে! Supabase-এ সেভ করার জন্য "Supabase ডাবল-ক্লাউড সেটিংস"-এ প্রজেক্ট URL ও Anon Key সেভ করুন।`);
+      } else {
+        setErrorMsg(`Firebase-এ ডাটা সেভ হলেও Supabase-এ টেবিল খুঁজে পাওয়া যায়নি! অনুগ্রহ করে "Supabase ডাবল-ক্লাউড কানেকশন সেটিংস"-এ গিয়ে SQL কোড দিয়ে টেবিল ক্রিয়েট করুন ও "কানেকশন টেস্ট করুন" বাটনে চাপ দিন।`);
+      }
       loadLocalStats();
     } catch (err: any) {
       console.error('Cloud sync failed:', err);

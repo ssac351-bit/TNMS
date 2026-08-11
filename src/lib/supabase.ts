@@ -142,22 +142,26 @@ export async function testSupabaseConnection(): Promise<{ success: boolean; mess
   }
 
   try {
-    // Try sending a test ping save
+    // Try sending a test ping save directly to get detailed error if any
     const testId = 'connection_test_ping';
-    const saved = await saveToSupabase('SyncData', testId, {
-      ping: 'ok',
-      time: new Date().toISOString()
-    });
+    const payload = {
+      id: testId,
+      data: { ping: 'ok', time: new Date().toISOString() },
+      updated_at: new Date().toISOString()
+    };
+    
+    const { error } = await client.from('SyncData').upsert(payload, { onConflict: 'id' });
 
-    if (saved) {
+    if (!error) {
       return {
         success: true,
         message: 'Supabase-এর সাথে সফলভাবে ডাটা আদান-প্রদান (Read/Write) নিশ্চিত করা হয়েছে!'
       };
     } else {
+      console.warn('Supabase test ping error:', error);
       return {
         success: false,
-        message: 'Supabase সার্ভারে কানেক্ট হওয়া গেলেও টেবিলে তথ্য লেখা যায়নি। Supabase Project-এ "SyncData", "Organizations", বা "RealDocuments" টেবিল তৈরি আছে কিনা ও RLS পারমিশন চেক করুন।'
+        message: `Supabase ত্রুটি (${error.code || 'RLS'}): ${error.message}। সমাধান: Supabase-এ "SyncData", "Organizations" ও "RealDocuments" টেবিলগুলোর RLS (Row Level Security) বন্ধ (Disable) করুন অথবা SQL Editor-এ Policy রান করুন।`
       };
     }
   } catch (err: any) {
