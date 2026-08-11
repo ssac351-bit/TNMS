@@ -55,19 +55,35 @@ export async function saveToSupabase(table: string, id: string, data: any): Prom
       updated_at: new Date().toISOString()
     };
 
-    const { error } = await client
+    let { error } = await client
       .from(table)
       .upsert(payload, { onConflict: 'id' });
 
     if (error) {
       console.warn(`Supabase upsert warning for table ${table}:`, error.message);
-      // Fallback attempt: if table accepts raw data keys directly
+      // Fallback 1: Try lowercase table name (e.g., syncdata instead of SyncData)
+      const lowerTable = table.toLowerCase();
+      const resLower = await client.from(lowerTable).upsert(payload, { onConflict: 'id' });
+      if (!resLower.error) {
+        console.log(`[Supabase Dual-Sync Success] Saved to lowercase table '${lowerTable}' (id: ${id})`);
+        return true;
+      }
+
+      // Fallback 2: if table accepts raw data keys directly
       const directPayload = { id, ...data, updated_at: new Date().toISOString() };
       const { error: err2 } = await client.from(table).upsert(directPayload, { onConflict: 'id' });
-      if (err2) {
-        console.warn(`Supabase direct upsert warning for table ${table}:`, err2.message);
-        return false;
+      if (!err2) {
+        console.log(`[Supabase Dual-Sync Success] Saved with direct payload to '${table}' (id: ${id})`);
+        return true;
       }
+
+      const { error: err3 } = await client.from(lowerTable).upsert(directPayload, { onConflict: 'id' });
+      if (!err3) {
+        console.log(`[Supabase Dual-Sync Success] Saved with direct payload to lowercase '${lowerTable}' (id: ${id})`);
+        return true;
+      }
+
+      return false;
     }
     console.log(`[Supabase Dual-Sync Success] Saved to table '${table}' (id: ${id})`);
     return true;
@@ -150,18 +166,22 @@ export async function testSupabaseConnection(): Promise<{ success: boolean; mess
       updated_at: new Date().toISOString()
     };
     
-    const { error } = await client.from('SyncData').upsert(payload, { onConflict: 'id' });
+    let res = await client.from('SyncData').upsert(payload, { onConflict: 'id' });
+    if (res.error) {
+      // Try lowercase 'syncdata'
+      res = await client.from('syncdata').upsert(payload, { onConflict: 'id' });
+    }
 
-    if (!error) {
+    if (!res.error) {
       return {
         success: true,
         message: 'Supabase-এর সাথে সফলভাবে ডাটা আদান-প্রদান (Read/Write) নিশ্চিত করা হয়েছে!'
       };
     } else {
-      console.warn('Supabase test ping error:', error);
+      console.warn('Supabase test ping error:', res.error);
       return {
         success: false,
-        message: `Supabase ত্রুটি (${error.code || 'RLS'}): ${error.message}। সমাধান: Supabase-এ "SyncData", "Organizations" ও "RealDocuments" টেবিলগুলোর RLS (Row Level Security) বন্ধ (Disable) করুন অথবা SQL Editor-এ Policy রান করুন।`
+        message: `Supabase ত্রুটি (${res.error.code || 'ERR'}): ${res.error.message}। এটি সমাধান করতে Supabase SQL Editor-এ 'GRANT ALL' ও 'DISABLE RLS' কমান্ডটি পুনরায় রান করুন।`
       };
     }
   } catch (err: any) {

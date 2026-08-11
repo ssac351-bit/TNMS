@@ -81,7 +81,13 @@ CREATE TABLE IF NOT EXISTS "RealDocuments" (
 -- Disable Row Level Security (RLS) so App can read/write data freely
 ALTER TABLE "SyncData" DISABLE ROW LEVEL SECURITY;
 ALTER TABLE "Organizations" DISABLE ROW LEVEL SECURITY;
-ALTER TABLE "RealDocuments" DISABLE ROW LEVEL SECURITY;`;
+ALTER TABLE "RealDocuments" DISABLE ROW LEVEL SECURITY;
+
+-- Grant API Permissions to anon and authenticated roles
+GRANT ALL ON TABLE "SyncData" TO anon, authenticated, postgres, service_role;
+GRANT ALL ON TABLE "Organizations" TO anon, authenticated, postgres, service_role;
+GRANT ALL ON TABLE "RealDocuments" TO anon, authenticated, postgres, service_role;
+GRANT USAGE ON SCHEMA public TO anon, authenticated;`;
 
   const copySupabaseSql = () => {
     navigator.clipboard.writeText(supabaseSqlCode);
