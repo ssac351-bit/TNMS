@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { Branch, Staff, Holiday } from '../types';
+import { formatDDMMYYYY } from '../lib/dateUtils';
 
 interface ReportViewsProps {
   selectedReportType: string;
@@ -134,7 +135,7 @@ export default function ReportViews({
                       <td className="px-4 py-2.5 font-semibold text-emerald-800">{manager}</td>
                       <td className="px-4 py-2.5 font-mono">{b.phone}</td>
                       <td className="px-4 py-2.5 text-slate-500">{b.address}</td>
-                      <td className="px-4 py-2.5 font-mono text-slate-500">{b.addDate}</td>
+                      <td className="px-4 py-2.5 font-mono text-slate-500">{formatDDMMYYYY(b.addDate)}</td>
                       <td className="px-4 py-2.5 text-center">
                         <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${
                           b.status === 'closed' ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'
@@ -230,8 +231,8 @@ export default function ReportViews({
                       </td>
                       <td className="px-4 py-2.5 font-mono">{s.phone}</td>
                       <td className="px-4 py-2.5 font-bold text-slate-600">{branchName}</td>
-                      <td className="px-4 py-2.5 font-mono text-slate-500">{s.joiningDate}</td>
-                      <td className="px-4 py-2.5 font-mono text-slate-500">{s.branchJoiningDate || '-'}</td>
+                      <td className="px-4 py-2.5 font-mono text-slate-500">{formatDDMMYYYY(s.joiningDate)}</td>
+                      <td className="px-4 py-2.5 font-mono text-slate-500">{s.branchJoiningDate ? formatDDMMYYYY(s.branchJoiningDate) : '-'}</td>
                     </tr>
                   );
                 })
@@ -311,9 +312,9 @@ export default function ReportViews({
                       </span>
                     </td>
                     <td className="px-4 py-2.5 font-bold text-slate-800">{h.name}</td>
-                    <td className="px-4 py-2.5 font-mono text-slate-650">{h.date || '-'}</td>
+                    <td className="px-4 py-2.5 font-mono text-slate-650">{h.date ? formatDDMMYYYY(h.date) : '-'}</td>
                     <td className="px-4 py-2.5 font-bold text-emerald-700">{h.dayOfWeek || '-'}</td>
-                    <td className="px-4 py-2.5 font-mono text-slate-500">{h.addDate}</td>
+                    <td className="px-4 py-2.5 font-mono text-slate-500">{formatDDMMYYYY(h.addDate)}</td>
                   </tr>
                 ))
               )}

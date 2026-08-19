@@ -29,6 +29,7 @@ import { MemberPassbook } from './MemberPassbook';
 import { calculateFdrInterest } from './fdrCalculator';
 import { processLoanAdjustment } from '../lib/loanAdjustment';
 import DocumentCenter from './DocumentCenter';
+import { formatDDMMYYYY } from '../lib/dateUtils';
 
 interface MemberInformationViewProps {
   onBack: () => void;
@@ -546,7 +547,7 @@ export const MemberInformationView: React.FC<MemberInformationViewProps> = ({
                       </div>
                       <div>
                         <div className="text-slate-400 font-bold mb-0.5">ভর্তির তারিখ:</div>
-                        <div className="text-slate-800 font-mono font-black">{member.admissionDate || member.addDate || 'N/A'}</div>
+                        <div className="text-slate-800 font-mono font-black">{member.admissionDate || member.addDate ? formatDDMMYYYY(member.admissionDate || member.addDate) : 'N/A'}</div>
                       </div>
                     </div>
 

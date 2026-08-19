@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Organization, Staff, Group, Branch } from '../types';
 import { registerDeletedId } from '../lib/deletedIds';
+import { formatDDMMYYYY } from '../lib/dateUtils';
 import { 
   Search, 
   Calendar, 
@@ -413,7 +414,7 @@ export function MasterRollView({
                         {(idx + 1).toLocaleString('bn-BD')}
                       </td>
                       <td className="p-3.5 font-bold text-slate-800 font-mono">
-                        {p.disbursedDate || p.expectedDisburseDate || 'N/A'}
+                        {p.disbursedDate || p.expectedDisburseDate ? formatDDMMYYYY(p.disbursedDate || p.expectedDisburseDate) : 'N/A'}
                       </td>
                       <td className="p-3.5">
                         <div className="font-extrabold text-[#2f6ce5]">{p.memberName}</div>

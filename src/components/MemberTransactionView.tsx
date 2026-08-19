@@ -696,19 +696,20 @@ export const MemberTransactionView: React.FC<MemberTransactionViewProps> = ({
   const colCBS_effective = cbsAlreadyDeposited ? 0 : colCBS;
   const netAmount = (colPL + colGS + colCBS_effective + colLTS) - (wthGS + wthCBS);
 
-  // Proposed/effective balances based on current form inputs
+  // Proposed/effective balances based on current form inputs (used upon save)
   const effectivePlOutstanding = Math.max(0, basePlOutstanding - colPL);
   const effectiveGsBalance = Math.max(0, baseGsBalance + colGS - wthGS);
   const effectiveCbsBalance = Math.max(0, baseCbsBalance + colCBS_effective - wthCBS);
   const effectiveLtsBalance = baseLtsBalance + colLTS;
 
-  const plOutstanding = effectivePlOutstanding;
+  // Current recorded balances to display on the screen (does NOT prematurely change before saving)
+  const plOutstanding = basePlOutstanding;
   const plInstallment = basePlInstallment;
-  const cbsBalance = effectiveCbsBalance;
+  const cbsBalance = baseCbsBalance;
   const cbsInstallment = baseCbsInstallment;
-  const ltsBalance = effectiveLtsBalance;
+  const ltsBalance = baseLtsBalance;
   const ltsInstallment = baseLtsInstallment;
-  const gsBalance = effectiveGsBalance;
+  const gsBalance = baseGsBalance;
   const gsInstallment = baseGsInstallment;
 
   const hasPl = (currentPlOutstanding > 0 || basePlOutstanding > 0);

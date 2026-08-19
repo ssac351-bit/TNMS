@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { formatDDMMYYYY } from '../lib/dateUtils';
 
 interface CashReceiptPaymentViewProps {
   transactions: any[];
@@ -63,7 +64,7 @@ export const CashReceiptPaymentView: React.FC<CashReceiptPaymentViewProps> = ({ 
                     <tbody>
                       {groupedTransactions.receipts[head].map(t => (
                         <tr key={t.id} className="border-b">
-                          <td className="p-2">{t.addDate}</td>
+                          <td className="p-2">{formatDDMMYYYY(t.addDate || t.date)}</td>
                           <td className="p-2">{t.description || t.note || t.category}</td>
                           <td className="p-2 text-right text-emerald-700 font-bold">{t.amount}</td>
                         </tr>
@@ -88,7 +89,7 @@ export const CashReceiptPaymentView: React.FC<CashReceiptPaymentViewProps> = ({ 
                     <tbody>
                       {groupedTransactions.payments[head].map(t => (
                         <tr key={t.id} className="border-b">
-                          <td className="p-2">{t.addDate}</td>
+                          <td className="p-2">{formatDDMMYYYY(t.addDate || t.date)}</td>
                           <td className="p-2">{t.description || t.note || t.category}</td>
                           <td className="p-2 text-right text-rose-700 font-bold">{t.amount}</td>
                         </tr>

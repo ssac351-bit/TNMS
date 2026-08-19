@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { COA_TREE } from '../lib/coa';
+import { formatDDMMYYYY } from '../lib/dateUtils';
 import { 
   BookOpen, 
   Search, 
@@ -332,7 +333,7 @@ export const GeneralJournalView: React.FC<GeneralJournalViewProps> = ({
           <tbody>
             {transactions.filter(t => t.type === 'manual_journal').map(tx => (
               <tr key={tx.id} className="border-b font-semibold text-slate-700">
-                <td className="p-3">{tx.addDate}</td>
+                <td className="p-3">{formatDDMMYYYY(tx.addDate || tx.date)}</td>
                 <td className="p-3 font-medium text-slate-600">{tx.note}</td>
                 <td className="p-3 text-right text-emerald-700 font-bold">
                   <div className="text-[11px]">{getAccountLabel(tx.debitAcc)}</div>

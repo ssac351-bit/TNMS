@@ -14,6 +14,7 @@ import MemberDashboard from './components/MemberDashboard';
 import { db } from './lib/firebase';
 import { collection, getDocs, doc, setDoc, deleteDoc, getDocFromServer } from 'firebase/firestore';
 import { saveToSupabase, deleteFromSupabase } from './lib/supabase';
+import { hydrateOrgFromCloud, hydrateAllOrgsFromCloud } from './lib/cloudAutoSync';
 
 export default function App() {
   // Authentication states
@@ -93,8 +94,15 @@ export default function App() {
           if (freshOrg) {
             setActiveOrg(freshOrg);
             localStorage.setItem('tanzil_session_activeOrg', JSON.stringify(freshOrg));
+            // Immediate priority auto-hydration for active logged-in org
+            const sessionStaff = localStorage.getItem('tanzil_session_activeStaff');
+            const staffObj = sessionStaff ? JSON.parse(sessionStaff) : null;
+            hydrateOrgFromCloud(freshOrg.id, staffObj?.staffId || staffObj?.id);
           }
         }
+
+        // Automatic background cloud auto-hydration for all organizations on app start
+        hydrateAllOrgsFromCloud(finalOrgs);
       } catch (error) {
         console.warn("Error/Timeout fetching organizations from Firestore (using local fallback): ", error);
         // Fallback to local storage
@@ -112,8 +120,12 @@ export default function App() {
           if (freshOrg) {
             setActiveOrg(freshOrg);
             localStorage.setItem('tanzil_session_activeOrg', JSON.stringify(freshOrg));
+            const sessionStaff = localStorage.getItem('tanzil_session_activeStaff');
+            const staffObj = sessionStaff ? JSON.parse(sessionStaff) : null;
+            hydrateOrgFromCloud(freshOrg.id, staffObj?.staffId || staffObj?.id);
           }
         }
+        hydrateAllOrgsFromCloud(parsed);
       } finally {
         setLoadingOrgs(false);
         console.log("Loading organizations finished.");
@@ -317,6 +329,11 @@ export default function App() {
     }
     setIsLoggedIn(true);
     localStorage.setItem('tanzil_session_loggedIn', 'true');
+
+    // Trigger instant cloud auto-load on login
+    if (activeOrganization?.id) {
+      hydrateOrgFromCloud(activeOrganization.id, matchedUser?.staffId || matchedUser?.id);
+    }
   };
 
   // Handle logout

@@ -46,12 +46,12 @@ function parseWorkingDay(dayStr: string): Date {
   return isNaN(timestamp) ? new Date() : new Date(timestamp);
 }
 
-// Helper to format Date to DD-MM-YYYY
+// Helper to format Date to DD/MM/YYYY
 function formatDateToDDMMYYYY(date: Date): string {
   const dd = String(date.getDate()).padStart(2, '0');
   const mm = String(date.getMonth() + 1).padStart(2, '0');
   const yyyy = date.getFullYear();
-  return `${dd}-${mm}-${yyyy}`;
+  return `${dd}/${mm}/${yyyy}`;
 }
 
 // Helper to format Date to YYYY-MM-DD for standard html inputs

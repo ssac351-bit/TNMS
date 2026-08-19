@@ -25,6 +25,7 @@ import {
   Receipt
 } from 'lucide-react';
 import { parseBanglaFloat, convertBanglaToEnglishNumber } from '../utils/numberHelper';
+import { formatDDMMYYYY } from '../lib/dateUtils';
 
 interface ShareManagementViewProps {
   org: any;
@@ -820,7 +821,7 @@ export const ShareManagementView: React.FC<ShareManagementViewProps> = ({
                         <td className="px-4 py-3 text-slate-400 font-mono font-bold">{idx + 1}</td>
                         <td className="px-4 py-3">
                           <div className="font-extrabold text-slate-900">{log.yearMonth}</div>
-                          <div className="text-[10px] text-slate-400 font-mono">{log.distributionDate}</div>
+                          <div className="text-[10px] text-slate-400 font-mono">{formatDDMMYYYY(log.distributionDate)}</div>
                         </td>
                         <td className="px-4 py-3">
                           <div className="font-bold text-slate-800">{log.memberName}</div>

@@ -27,6 +27,7 @@ import {
 import { Organization, Staff, Group, Member, Branch } from '../types';
 import { calculateLoanOverdueAndSchedule } from './MemberTransactionView';
 import { processLoanAdjustment } from '../lib/loanAdjustment';
+import { formatDDMMYYYY, downloadExcelCsv } from '../lib/dateUtils';
 
 interface UnifiedReportsPanelProps {
   org: Organization;
@@ -51,17 +52,9 @@ function ensureYYYYMMDD(dayStr: string): string {
   return dayStr;
 }
 
-// Utility to format Date to YYYY-MM-DD or DD-MM-YYYY
+// Utility to format Date to DD/MM/YYYY
 function formatDateToDDMMYYYY(dateStr: string): string {
-  if (!dateStr) return '';
-  const parts = dateStr.split('-');
-  if (parts.length === 3) {
-    if (parts[0].length === 4) {
-      // YYYY-MM-DD -> DD-MM-YYYY
-      return `${parts[2]}-${parts[1]}-${parts[0]}`;
-    }
-  }
-  return dateStr;
+  return formatDDMMYYYY(dateStr);
 }
 
 export const UnifiedReportsPanel: React.FC<UnifiedReportsPanelProps> = ({
@@ -801,7 +794,7 @@ export const UnifiedReportsPanel: React.FC<UnifiedReportsPanelProps> = ({
         const tot = pl + gs + cbs + lts;
 
         rows.push([
-          tx.date,
+          formatDDMMYYYY(tx.date),
           tx.id || 'N/A',
           tx.memberId || '',
           tx.memberName || '',
@@ -848,7 +841,7 @@ export const UnifiedReportsPanel: React.FC<UnifiedReportsPanelProps> = ({
         const instCount = tx.proposalDetail?.installmentsCount || 0;
 
         rows.push([
-          tx.date,
+          formatDDMMYYYY(tx.date),
           tx.memberId || '',
           tx.memberName || '',
           lType,
@@ -902,7 +895,7 @@ export const UnifiedReportsPanel: React.FC<UnifiedReportsPanelProps> = ({
         if (gsDep > 0 || gsWth > 0 || cbsDep > 0 || cbsWth > 0 || ltsDep > 0 || ltsWth > 0) {
           const rowNet = (gsDep + cbsDep + ltsDep) - (gsWth + cbsWth + ltsWth);
           rows.push([
-            tx.date,
+            formatDDMMYYYY(tx.date),
             tx.memberId || '',
             tx.memberName || '',
             gsDep,
@@ -1060,14 +1053,7 @@ export const UnifiedReportsPanel: React.FC<UnifiedReportsPanelProps> = ({
     ].join('\r\n');
 
     // UTF-8 BOM so Excel opens Bengali characters properly
-    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `${filename}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    downloadExcelCsv(csvContent, filename);
   };
 
   return (
@@ -1119,7 +1105,7 @@ export const UnifiedReportsPanel: React.FC<UnifiedReportsPanelProps> = ({
             className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[11px] rounded-xl shadow-xs transition cursor-pointer"
           >
             <Download size={13} />
-            <span>এক্সেল ফাইল ডাউনলোড</span>
+            <span>এক্সপোর্ট টু এক্সেল (Export to Excel)</span>
           </button>
         </div>
       </div>

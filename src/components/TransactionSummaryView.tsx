@@ -23,6 +23,7 @@ import {
   UserCheck
 } from 'lucide-react';
 import { Group, Member } from '../types';
+import { formatDDMMYYYY } from '../lib/dateUtils';
 
 interface TransactionSummaryViewProps {
   onBack: () => void;
@@ -348,7 +349,7 @@ export const TransactionSummaryView: React.FC<TransactionSummaryViewProps> = ({
               >
                 <option value="all">সব তারিখ</option>
                 {availableDates.map(date => (
-                  <option key={date} value={date}>{date === workingDay ? `${date} (আজকের কর্মদিবস)` : date}</option>
+                  <option key={date} value={date}>{date === workingDay ? `${formatDDMMYYYY(date)} (আজকের কর্মদিবস)` : formatDDMMYYYY(date)}</option>
                 ))}
               </select>
             </div>
@@ -526,7 +527,7 @@ export const TransactionSummaryView: React.FC<TransactionSummaryViewProps> = ({
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <div className="font-mono text-[10px] text-slate-400 font-bold">{tx.id || 'N/A'}</div>
                         <div className="text-[10px] font-bold text-slate-600 mt-0.5 flex items-center gap-1 font-mono">
-                          <Calendar size={10} className="text-slate-400" /> {txDate}
+                          <Calendar size={10} className="text-slate-400" /> {formatDDMMYYYY(txDate)}
                         </div>
                       </td>
                       <td className="py-3.5 px-4">

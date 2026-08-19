@@ -88,6 +88,7 @@ import { CashReceiptPaymentView } from './CashReceiptPaymentView';
 import { registerDeletedId } from '../lib/deletedIds';
 import { TanzilLogo } from './TanzilLogo';
 import { OrgLogo } from './OrgLogo';
+import { formatDDMMYYYY, downloadExcelCsv } from '../lib/dateUtils';
 
 interface BranchManagerDashboardProps {
   org: Organization;
@@ -264,6 +265,10 @@ export default function BranchManagerDashboard({ org, staff, onLogout, isSimulat
   };
 
   const handleCloseDay = () => {
+    if (!isBM && !isSimulated) {
+      alert('শুধুমাত্র শাখা ব্যবস্থাপক (BM) বা অ্যাডমিন কর্মদিবস সমাপ্ত (ডে ক্লোজ) করতে পারেন।');
+      return;
+    }
     console.log("handleCloseDay called. Current workingDay:", workingDay);
     if (!window.confirm(`${workingDay} এই দিনটি সফলভাবে ক্লোজ করে পরবর্তী কর্মদিবসে প্রবেশ করতে চান?`)) return;
     
@@ -3198,25 +3203,36 @@ export default function BranchManagerDashboard({ org, staff, onLogout, isSimulat
 
               {/* Working Date Button */}
               <div className="flex items-center gap-1.5">
-                <button 
-                  type="button"
-                  onClick={() => setIsWorkingDayModalOpen(true)}
-                  className={`flex items-center gap-1.5 font-bold px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
-                    localStorage.getItem(`tanzil_working_day_override_${org.id}_branch_${staff.branchId || 'default'}_user_${staff.id || staff.staffId || 'admin'}`)
-                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                      : 'bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-300'
-                  }`}
-                  title="কর্মদিবস পরিবর্তন করতে বা ডে ক্লোজ করতে এখানে ক্লিক করুন"
-                >
-                  <Clock size={12} className={localStorage.getItem(`tanzil_working_day_override_${org.id}_branch_${staff.branchId || 'default'}_user_${staff.id || staff.staffId || 'admin'}`) ? "text-amber-400 animate-bounce" : "text-emerald-400 animate-pulse"} />
-                  <span>তারিখ:</span>
-                  <span className="font-mono font-black">{workingDay}</span>
-                  {localStorage.getItem(`tanzil_working_day_override_${org.id}_branch_${staff.branchId || 'default'}_user_${staff.id || staff.staffId || 'admin'}`) && (
-                    <span className="text-[9px] bg-amber-500 text-slate-900 font-extrabold px-1 rounded-sm ml-1 select-none">সেশন</span>
-                  )}
-                </button>
+                {(isBM || isSimulated) ? (
+                  <button 
+                    type="button"
+                    onClick={() => setIsWorkingDayModalOpen(true)}
+                    className={`flex items-center gap-1.5 font-bold px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                      localStorage.getItem(`tanzil_working_day_override_${org.id}_branch_${staff.branchId || 'default'}_user_${staff.id || staff.staffId || 'admin'}`)
+                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                        : 'bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-300'
+                    }`}
+                    title="কর্মদিবস পরিবর্তন করতে বা ডে ক্লোজ করতে এখানে ক্লিক করুন"
+                  >
+                    <Clock size={12} className={localStorage.getItem(`tanzil_working_day_override_${org.id}_branch_${staff.branchId || 'default'}_user_${staff.id || staff.staffId || 'admin'}`) ? "text-amber-400 animate-bounce" : "text-emerald-400 animate-pulse"} />
+                    <span>তারিখ:</span>
+                    <span className="font-mono font-black">{workingDay}</span>
+                    {localStorage.getItem(`tanzil_working_day_override_${org.id}_branch_${staff.branchId || 'default'}_user_${staff.id || staff.staffId || 'admin'}`) && (
+                      <span className="text-[9px] bg-amber-500 text-slate-900 font-extrabold px-1 rounded-sm ml-1 select-none">সেশন</span>
+                    )}
+                  </button>
+                ) : (
+                  <div 
+                    className="flex items-center gap-1.5 font-bold px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700/80 text-emerald-300"
+                    title="শাখা কার্যদিবস (মাঠ কর্মী মুড)"
+                  >
+                    <Clock size={12} className="text-emerald-400" />
+                    <span>তারিখ:</span>
+                    <span className="font-mono font-black">{workingDay}</span>
+                  </div>
+                )}
 
-                {localStorage.getItem(`tanzil_working_day_override_${org.id}_branch_${staff.branchId || 'default'}_user_${staff.id || staff.staffId || 'admin'}`) && (
+                {(isBM || isSimulated) && localStorage.getItem(`tanzil_working_day_override_${org.id}_branch_${staff.branchId || 'default'}_user_${staff.id || staff.staffId || 'admin'}`) && (
                   <button
                     type="button"
                     onClick={handleResetWorkingDay}
@@ -3227,15 +3243,17 @@ export default function BranchManagerDashboard({ org, staff, onLogout, isSimulat
                   </button>
                 )}
 
-                <button
-                  type="button"
-                  onClick={handleCloseDay}
-                  className="flex items-center gap-1.5 bg-rose-600 hover:bg-rose-700 text-white font-black px-2.5 py-1 rounded-lg text-xs cursor-pointer shadow-xs transition-all active:scale-95 ml-1"
-                  title="আজকের দিন ক্লোজ করে পরবর্তী কর্মদিবসে যান"
-                >
-                  <Lock size={12} />
-                  <span>ডে ক্লোজ</span>
-                </button>
+                {(isBM || isSimulated) && (
+                  <button
+                    type="button"
+                    onClick={handleCloseDay}
+                    className="flex items-center gap-1.5 bg-rose-600 hover:bg-rose-700 text-white font-black px-2.5 py-1 rounded-lg text-xs cursor-pointer shadow-xs transition-all active:scale-95 ml-1"
+                    title="আজকের দিন ক্লোজ করে পরবর্তী কর্মদিবসে যান"
+                  >
+                    <Lock size={12} />
+                    <span>ডে ক্লোজ</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -3349,15 +3367,17 @@ export default function BranchManagerDashboard({ org, staff, onLogout, isSimulat
                   <span className="text-slate-700 font-bold">
                     কার্যদিবস: {new Date(workingDay + 'T00:00:00').toLocaleDateString('bn-BD', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                   </span>
-                  <button 
-                    type="button"
-                    onClick={handleCloseDay}
-                    className="flex items-center gap-1.5 px-3 py-1 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white rounded-lg text-xs font-black shadow-xs transition duration-150 cursor-pointer"
-                    title="আজকের কর্মদিবস সমাপ্ত করে পরবর্তী কর্মদিবসে যান"
-                  >
-                    <Lock size={12} />
-                    <span>ডে ক্লোজ (Close Day)</span>
-                  </button>
+                  {(isBM || isSimulated) && (
+                    <button 
+                      type="button"
+                      onClick={handleCloseDay}
+                      className="flex items-center gap-1.5 px-3 py-1 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white rounded-lg text-xs font-black shadow-xs transition duration-150 cursor-pointer"
+                      title="আজকের কর্মদিবস সমাপ্ত করে পরবর্তী কর্মদিবসে যান"
+                    >
+                      <Lock size={12} />
+                      <span>ডে ক্লোজ (Close Day)</span>
+                    </button>
+                  )}
                 </div>
                 
 
@@ -6636,26 +6656,44 @@ export default function BranchManagerDashboard({ org, staff, onLogout, isSimulat
                           return true;
                         });
 
-                        // 4. TSV Copier for Excel
-                        const handleCopyColumnarToClipboard = () => {
+                        // 4. Excel File Exporter
+                        const handleExportColumnarToExcel = () => {
                           const headers = [
                             'তারিখ (১)', 'গতদিনের হাতে নগদ (২)', 'কিস্তি ও সার্ভিস চার্জ আদায় (৩)', 'সাধারণ সঞ্চয় আদায় (৪)', 'দীর্ঘমেয়াদী সঞ্চয় আদায় (৫)', 'সিবিএস সঞ্চয় আদায় (৬)', 'এলএসআরএফ (LSRF) আদায় (৭)', 'ব্যাংক উত্তোলন (৮)', 'অন্যান্য প্রাপ্তি (৯)', 'মোট আদায় (১০)',
                             'ঋণ বিতরণ (১১)', 'সাধারণ সঞ্চয় উত্তোলন (১২)', 'সাধারণ সঞ্চয় ফেরত (১৩)', 'দীর্ঘমেয়াদী সঞ্চয় উত্তোলন (১৪)', 'দীর্ঘমেয়াদী সঞ্চয় ফেরত (১৫)', 'সিবিএস সঞ্চয় উত্তোলন (১৬)', 'সিবিএস সঞ্চয় ফেরত (১৭)', 'এলএসআরএফ (LSRF) ফেরত/দাবি (১৮)', 'ব্যাংক জমা (১৯)', 'অফিস খরচ ও নগদ ব্যয় (২০)', 'মোট ব্যয় (২১)', 'আজকের সমাপনী নগদ (২২)'
                           ];
-                          let tsvContent = headers.join('\t') + '\n';
                           
                           // Chronological order (oldest first for excel spreadsheets)
                           const rows = [...filteredDates].reverse().map(d => getColumnarRowForDate(d));
-                          rows.forEach(r => {
-                            tsvContent += [
-                              r.date, r.opening, r.installment_sc, r.gs, r.lts, r.cbs, r.lsrf_collection, r.bankWithdrawal, r.otherReceipts, r.totalReceipts,
-                              r.loanDisburse, r.gsWithdrawal, r.gsRefund, r.ltsWithdrawal, r.ltsRefund, r.cbsWithdrawal, r.cbsRefund, r.lsrfRefund, r.bankDeposit, r.officeExpenses, r.totalPayments, r.closing
-                            ].join('\t') + '\n';
-                          });
+                          const csvRows = [
+                            headers.join(','),
+                            ...rows.map(r => [
+                              `"${formatDDMMYYYY(r.date)}"`,
+                              r.opening,
+                              r.installment_sc,
+                              r.gs,
+                              r.lts,
+                              r.cbs,
+                              r.lsrf_collection,
+                              r.bankWithdrawal,
+                              r.otherReceipts,
+                              r.totalReceipts,
+                              r.loanDisburse,
+                              r.gsWithdrawal,
+                              r.gsRefund,
+                              r.ltsWithdrawal,
+                              r.ltsRefund,
+                              r.cbsWithdrawal,
+                              r.cbsRefund,
+                              r.lsrfRefund,
+                              r.bankDeposit,
+                              r.officeExpenses,
+                              r.totalPayments,
+                              r.closing
+                            ].join(','))
+                          ].join('\r\n');
                           
-                          navigator.clipboard.writeText(tsvContent)
-                            .then(() => alert('নগদান বই রেজিস্টার ডাটা ক্লিপবোর্ডে কপি হয়েছে! সরাসরি মাইক্রোসফট এক্সেল বা গুগল স্প্রেডশিটে পেস্ট (Ctrl+V) করতে পারবেন।'))
-                            .catch(() => alert('কপি করতে ব্যর্থ হয়েছে। অনুগ্রহ করে ব্রাউজার পারমিশন চেক করুন।'));
+                          downloadExcelCsv(csvRows, `Tanzil_Cash_Book_Register_${workingDay || 'Export'}`);
                         };
 
                         return (
@@ -6679,7 +6717,7 @@ export default function BranchManagerDashboard({ org, staff, onLogout, isSimulat
                                 </div>
                                 <div className="bg-white/10 border border-white/25 px-4 py-2.5 rounded-xl text-right">
                                   <span className="text-[9px] text-white/70 font-bold block leading-none">আজকের কর্মদিবস</span>
-                                  <span className="font-mono text-base font-black text-amber-300 block mt-1">{workingDay}</span>
+                                  <span className="font-mono text-base font-black text-amber-300 block mt-1">{formatDDMMYYYY(workingDay)}</span>
                                 </div>
                               </div>
                             </div>
@@ -6745,11 +6783,11 @@ export default function BranchManagerDashboard({ org, staff, onLogout, isSimulat
 
                                   <button
                                     type="button"
-                                    onClick={handleCopyColumnarToClipboard}
-                                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black rounded-xl flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
+                                    onClick={handleExportColumnarToExcel}
+                                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
                                   >
-                                    <FileSpreadsheet className="w-4 h-4 text-emerald-300" />
-                                    এক্সেলে ব্যবহারের জন্য কপি করুন (Copy for Excel)
+                                    <FileSpreadsheet className="w-4 h-4 text-emerald-200" />
+                                    এক্সপোর্ট টু এক্সেল (Export to Excel)
                                   </button>
                                 </div>
 

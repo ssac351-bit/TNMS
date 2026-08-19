@@ -26,6 +26,7 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { Group, Member } from '../types';
+import { formatDDMMYYYY } from '../lib/dateUtils';
 
 interface SavingsRefundRequest {
   id: string;
@@ -807,7 +808,7 @@ export const RealizedInformationView: React.FC<RealizedInformationViewProps> = (
                           {/* Extra Request details */}
                           <div className="flex items-center gap-4 text-[10px] font-semibold text-slate-400 flex-wrap">
                             <span>আবেদনের ধরণ: <strong className="text-slate-600">{req.status} ({req.reason})</strong></span>
-                            <span>তারিখ: <strong className="text-slate-600 font-mono">{req.returnDate}</strong></span>
+                            <span>তারিখ: <strong className="text-slate-600 font-mono">{formatDDMMYYYY(req.returnDate)}</strong></span>
                             {req.notes && <span className="italic bg-white px-2 py-0.5 rounded border border-slate-100">Note: {req.notes}</span>}
                           </div>
                         </div>
@@ -920,7 +921,7 @@ export const RealizedInformationView: React.FC<RealizedInformationViewProps> = (
                           </div>
                           <h5 className="text-xs font-black text-slate-800 mt-1">{req.productName} ({req.reason})</h5>
                         </div>
-                        <span className="text-slate-400 text-[10px] font-bold font-mono">{req.returnDate}</span>
+                        <span className="text-slate-400 text-[10px] font-bold font-mono">{formatDDMMYYYY(req.returnDate)}</span>
                       </div>
                       
                       <div className="grid grid-cols-2 gap-2 text-[11px] font-bold border-t border-slate-100 pt-2.5 mt-2">
@@ -1347,7 +1348,7 @@ export const RealizedInformationView: React.FC<RealizedInformationViewProps> = (
                               }`}>
                                 {t.type === 'savings_deposit' ? 'জমা' : t.type === 'savings_withdrawal' ? 'উত্তোলন' : 'ঋণ পরিশোধ'}
                               </span>
-                              <span className="text-slate-400 text-[10px] font-mono ml-2">{t.date}</span>
+                              <span className="text-slate-400 text-[10px] font-mono ml-2">{formatDDMMYYYY(t.date || t.addDate)}</span>
                             </div>
                             <span className="font-mono text-slate-800 font-black">{Number(t.amount || 0).toFixed(1)} TK</span>
                           </div>

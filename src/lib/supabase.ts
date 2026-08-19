@@ -123,12 +123,38 @@ export async function getFromSupabase(table: string, id?: string): Promise<any> 
 
   try {
     if (id) {
-      const { data, error } = await client.from(table).select('*').eq('id', id).maybeSingle();
-      if (error) throw error;
+      // 1. Try specified case
+      let { data, error } = await client.from(table).select('*').eq('id', id).maybeSingle();
+      
+      // 2. Try lowercase table fallback if not found or error
+      if (!data && (error || !data)) {
+        const lowerTable = table.toLowerCase();
+        const resLower = await client.from(lowerTable).select('*').eq('id', id).maybeSingle();
+        if (!resLower.error && resLower.data) {
+          data = resLower.data;
+          error = null;
+        }
+      }
+
+      if (error) {
+        console.warn(`Supabase fetch error for table ${table} (id: ${id}):`, error.message);
+        return null;
+      }
       return data?.data || data;
     } else {
-      const { data, error } = await client.from(table).select('*');
-      if (error) throw error;
+      let { data, error } = await client.from(table).select('*');
+      if (error) {
+        const lowerTable = table.toLowerCase();
+        const resLower = await client.from(lowerTable).select('*');
+        if (!resLower.error && resLower.data) {
+          data = resLower.data;
+          error = null;
+        }
+      }
+      if (error) {
+        console.warn(`Supabase fetch error for table ${table}:`, error.message);
+        return null;
+      }
       return data?.map((row: any) => row.data || row) || [];
     }
   } catch (err) {

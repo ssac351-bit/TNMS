@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../lib/firebase';
 import { saveToSupabase, getFromSupabase, isSupabaseConfigured, testSupabaseConnection } from '../lib/supabase';
+import { hydrateOrgFromCloud } from '../lib/cloudAutoSync';
 import { 
   collection, 
   doc, 
@@ -321,6 +322,10 @@ GRANT USAGE ON SCHEMA public TO anon, authenticated;`;
 
   useEffect(() => {
     loadLocalStats();
+    // Auto-hydrate on initial mount if local state is empty or on app startup
+    hydrateOrgFromCloud(org.id, userId).then(() => {
+      loadLocalStats();
+    });
     // Setup interval to keep counts updated every 5 seconds
     const t = setInterval(loadLocalStats, 5000);
     return () => clearInterval(t);
@@ -779,74 +784,51 @@ GRANT USAGE ON SCHEMA public TO anon, authenticated;`;
                 </p>
               </div>
 
-              {/* Offline Records Summary card - styling matches the user's uploaded mobile screenshot exactly! */}
-              <div className="bg-white text-slate-800 rounded-3xl border border-slate-200 p-5 shadow-sm space-y-4">
-                <div className="text-center select-none">
-                  <span className="text-slate-500 font-extrabold text-sm tracking-wide block mb-1">
-                    Offline Records Summary
+              {/* Offline Records Summary card */}
+              <div className="bg-white text-slate-800 rounded-2xl border border-slate-200 p-4 shadow-sm space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <span className="text-slate-600 font-extrabold text-xs tracking-wide">
+                    অফলাইন কালেকশন রেকর্ড সারসংক্ষেপ
+                  </span>
+                  <span className="text-[11px] font-bold text-slate-400 font-mono">
+                    মোট: {dailyTxs.length}
                   </span>
                 </div>
 
-                <div className="border border-slate-200/80 rounded-2xl p-4 bg-[#fbfcff] text-center space-y-3 select-none">
-                  <h5 className="font-extrabold text-slate-700 text-xs tracking-wider uppercase">
-                    DAILY COLLECTION
-                  </h5>
-                  <div className="flex flex-wrap justify-center items-center gap-x-4 gap-y-1.5 text-xs font-bold font-mono text-slate-800">
-                    <span>Total : {dailyTxs.length}</span>
-                    <span className="text-emerald-600">Synced : {syncedCount}</span>
-                    <span className="text-amber-600">Unsynced : {unsyncedCount}</span>
-                    <span className="text-red-500 font-bold">Failed : 0</span>
+                <div className="grid grid-cols-3 gap-2 text-center select-none">
+                  <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-2">
+                    <span className="text-[10px] text-slate-500 font-bold block uppercase">মোট এন্ট্রি</span>
+                    <span className="text-xs font-black font-mono text-slate-800">{dailyTxs.length}</span>
+                  </div>
+                  <div className="bg-emerald-50 border border-emerald-200/80 rounded-xl p-2">
+                    <span className="text-[10px] text-emerald-600 font-bold block uppercase">সিঙ্কড</span>
+                    <span className="text-xs font-black font-mono text-emerald-700">{syncedCount}</span>
+                  </div>
+                  <div className="bg-amber-50 border border-amber-200/80 rounded-xl p-2">
+                    <span className="text-[10px] text-amber-600 font-bold block uppercase">আনসিঙ্কড</span>
+                    <span className="text-xs font-black font-mono text-amber-700">{unsyncedCount}</span>
                   </div>
                 </div>
 
-                {/* Sync All button inside the nested card */}
-                <div className="text-center py-1">
-                  <button
-                    type="button"
-                    disabled={isSyncing || isRestoring}
-                    onClick={handleSyncToCloud}
-                    className="bg-[#2f6ce5] hover:bg-blue-600 disabled:opacity-50 active:scale-95 text-white font-extrabold text-xs px-8 py-2.5 rounded-full shadow-md leading-none text-center inline-flex items-center gap-2 cursor-pointer transition-all"
-                  >
-                    {isSyncing ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        <span>Syncing...</span>
-                      </>
-                    ) : (
-                      <>
-                        <UploadCloud className="w-3.5 h-3.5" />
-                        <span>Sync All</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                {/* List of today's collections */}
-                {dailyTxs.length > 0 ? (
-                  <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
+                {/* List of today's collections if present */}
+                {dailyTxs.length > 0 && (
+                  <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
                     {dailyTxs.map((tx: any, idx: number) => (
-                      <div key={tx.id || idx} className="bg-white border border-slate-200 p-4 rounded-2xl flex flex-col gap-2.5 shadow-2xs text-left text-xs transition-colors hover:bg-slate-50">
-                        <div className="flex items-center justify-between">
-                          <span className="font-black text-slate-800 tracking-wider">DAILY COLLECTION</span>
-                          {tx.synced ? (
-                            <span className="text-emerald-600 font-extrabold text-xs">
-                              Synced
-                            </span>
-                          ) : (
-                            <span className="text-slate-500 font-bold text-xs bg-slate-101 px-2.5 py-0.5 rounded-full border border-slate-200/50">
-                              Unsynced
-                            </span>
-                          )}
+                      <div key={tx.id || idx} className="bg-slate-50/80 border border-slate-200/70 p-2.5 rounded-xl flex items-center justify-between text-xs">
+                        <div className="font-semibold text-slate-700 truncate pr-2">
+                          <span className="text-blue-600 font-bold">{tx.groupName || 'সমিতি'}</span> ➔ <span className="text-slate-900 font-bold">{tx.memberName || 'সদস্য'}</span>
                         </div>
-                        <div className="font-semibold text-slate-700 leading-normal">
-                          Group: <span className="text-blue-600 font-bold">{tx.groupName || 'Unknown'}</span> {'->'} <span className="text-[#2c3e50] font-extrabold">{tx.memberName || 'Member'}</span>
-                        </div>
+                        {tx.synced ? (
+                          <span className="text-[10px] text-emerald-700 bg-emerald-100 font-extrabold px-2 py-0.5 rounded-full whitespace-nowrap">
+                            সিঙ্কড
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-amber-700 bg-amber-100 font-bold px-2 py-0.5 rounded-full whitespace-nowrap">
+                            লোকাল
+                          </span>
+                        )}
                       </div>
                     ))}
-                  </div>
-                ) : (
-                  <div className="text-center text-xs text-slate-400 py-4 font-bold border border-slate-150 border-dashed rounded-2xl">
-                    আজকের জন্য কোনো আদায়ের অফলাইন সামগ্রী সংরক্ষিত নেই
                   </div>
                 )}
               </div>
@@ -904,110 +886,112 @@ GRANT USAGE ON SCHEMA public TO anon, authenticated;`;
                 </div>
               </div>
 
-              {/* Supabase Configuration Section */}
-              <div className="bg-slate-800/40 rounded-xl p-3 border border-slate-700/40 text-left">
-                <button
-                  type="button"
-                  onClick={() => setShowSupabaseSettings(!showSupabaseSettings)}
-                  className="w-full flex items-center justify-between text-xs font-extrabold text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer"
-                >
-                  <span className="flex items-center gap-1.5">
-                    <Cloud size={14} />
-                    Supabase ডাবল-ক্লাউড কানেকশন সেটিংস
-                  </span>
-                  <span className="text-[10px] bg-emerald-500/10 px-2 py-0.5 rounded text-emerald-300 border border-emerald-500/20">
-                    {showSupabaseSettings ? 'আড়াল করুন' : 'কনফিগার করুন'}
-                  </span>
-                </button>
+              {/* Supabase Configuration Section - Visible ONLY for Admin role */}
+              {(!role || role.toLowerCase() === 'admin' || role === 'অ্যাডমিন') && (
+                <div className="bg-slate-800/40 rounded-xl p-3 border border-slate-700/40 text-left">
+                  <button
+                    type="button"
+                    onClick={() => setShowSupabaseSettings(!showSupabaseSettings)}
+                    className="w-full flex items-center justify-between text-xs font-extrabold text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <Cloud size={14} />
+                      Supabase ডাবল-ক্লাউড কানেকশন সেটিংস
+                    </span>
+                    <span className="text-[10px] bg-emerald-500/10 px-2 py-0.5 rounded text-emerald-300 border border-emerald-500/20">
+                      {showSupabaseSettings ? 'আড়াল করুন' : 'কনফিগার করুন'}
+                    </span>
+                  </button>
 
-                {showSupabaseSettings && (
-                  <div className="mt-3 space-y-2.5 pt-2 border-t border-slate-700/40 animate-in fade-in duration-200">
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-400 block mb-1">Supabase Project URL:</label>
-                      <input
-                        type="text"
-                        placeholder="https://xyzcompany.supabase.co"
-                        value={supabaseUrlInput}
-                        onChange={(e) => setSupabaseUrlInput(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-emerald-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-400 block mb-1">Supabase Anon Key:</label>
-                      <input
-                        type="password"
-                        placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..."
-                        value={supabaseKeyInput}
-                        onChange={(e) => setSupabaseKeyInput(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-emerald-500"
-                      />
-                    </div>
-                    <div className="flex gap-2 mt-1">
-                      <button
-                        type="button"
-                        onClick={saveSupabaseCredentials}
-                        className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-1.5 rounded-lg transition-colors cursor-pointer"
-                      >
-                        কনেকশন সেভ করুন
-                      </button>
-                      <button
-                        type="button"
-                        disabled={isTestingSupabase}
-                        onClick={handleTestSupabase}
-                        className="flex-1 bg-slate-700 hover:bg-slate-600 border border-slate-600 text-emerald-300 font-bold text-xs py-1.5 rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-                      >
-                        {isTestingSupabase ? (
-                          <>
-                            <Loader2 size={12} className="animate-spin" />
-                            <span>টেস্ট করা হচ্ছে...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Check size={12} />
-                            <span>কানেকশন টেস্ট করুন</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
+                  {showSupabaseSettings && (
+                    <div className="mt-3 space-y-2.5 pt-2 border-t border-slate-700/40 animate-in fade-in duration-200">
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-400 block mb-1">Supabase Project URL:</label>
+                        <input
+                          type="text"
+                          placeholder="https://xyzcompany.supabase.co"
+                          value={supabaseUrlInput}
+                          onChange={(e) => setSupabaseUrlInput(e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-400 block mb-1">Supabase Anon Key:</label>
+                        <input
+                          type="password"
+                          placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..."
+                          value={supabaseKeyInput}
+                          onChange={(e) => setSupabaseKeyInput(e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                      <div className="flex gap-2 mt-1">
+                        <button
+                          type="button"
+                          onClick={saveSupabaseCredentials}
+                          className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs py-1.5 rounded-lg transition-colors cursor-pointer"
+                        >
+                          কনেকশন সেভ করুন
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isTestingSupabase}
+                          onClick={handleTestSupabase}
+                          className="flex-1 bg-slate-700 hover:bg-slate-600 border border-slate-600 text-emerald-300 font-bold text-xs py-1.5 rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                        >
+                          {isTestingSupabase ? (
+                            <>
+                              <Loader2 size={12} className="animate-spin" />
+                              <span>টেস্ট করা হচ্ছে...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Check size={12} />
+                              <span>কানেকশন টেস্ট করুন</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
 
-                    {/* SQL Table Auto-Setup Assistant */}
-                    <div className="pt-2 border-t border-slate-700/50">
-                      <button
-                        type="button"
-                        onClick={() => setShowSqlScript(!showSqlScript)}
-                        className="w-full flex items-center justify-between text-[11px] font-bold text-indigo-300 hover:text-indigo-200 transition-colors py-1 cursor-pointer"
-                      >
-                        <span className="flex items-center gap-1">
-                          <Code size={12} />
-                          Supabase SQL টেবিল তৈরির কোড (Schema Fix)
-                        </span>
-                        <span className="text-[10px] text-indigo-400 underline">
-                          {showSqlScript ? 'লুকান' : 'দেখুন ও কপি করুন'}
-                        </span>
-                      </button>
+                      {/* SQL Table Auto-Setup Assistant */}
+                      <div className="pt-2 border-t border-slate-700/50">
+                        <button
+                          type="button"
+                          onClick={() => setShowSqlScript(!showSqlScript)}
+                          className="w-full flex items-center justify-between text-[11px] font-bold text-indigo-300 hover:text-indigo-200 transition-colors py-1 cursor-pointer"
+                        >
+                          <span className="flex items-center gap-1">
+                            <Code size={12} />
+                            Supabase SQL টেবিল তৈরির কোড (Schema Fix)
+                          </span>
+                          <span className="text-[10px] text-indigo-400 underline">
+                            {showSqlScript ? 'লুকান' : 'দেখুন ও কপি করুন'}
+                          </span>
+                        </button>
 
-                      {showSqlScript && (
-                        <div className="mt-2 p-2 bg-slate-950 rounded-lg border border-slate-800 text-left animate-in fade-in">
-                          <div className="flex justify-between items-center mb-1.5">
-                            <span className="text-[10px] text-slate-400 font-bold">SQL Editor-এ রান করার জন্য কোড:</span>
-                            <button
-                              type="button"
-                              onClick={copySupabaseSql}
-                              className="inline-flex items-center gap-1 text-[10px] bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-2 py-0.5 rounded cursor-pointer transition-colors"
-                            >
-                              {copiedSql ? <Check size={10} /> : <Copy size={10} />}
-                              <span>{copiedSql ? 'কপি হয়েছে!' : 'কপি করুন'}</span>
-                            </button>
+                        {showSqlScript && (
+                          <div className="mt-2 p-2 bg-slate-950 rounded-lg border border-slate-800 text-left animate-in fade-in">
+                            <div className="flex justify-between items-center mb-1.5">
+                              <span className="text-[10px] text-slate-400 font-bold">SQL Editor-এ রান করার জন্য কোড:</span>
+                              <button
+                                type="button"
+                                onClick={copySupabaseSql}
+                                className="inline-flex items-center gap-1 text-[10px] bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-2 py-0.5 rounded cursor-pointer transition-colors"
+                              >
+                                {copiedSql ? <Check size={10} /> : <Copy size={10} />}
+                                <span>{copiedSql ? 'কপি হয়েছে!' : 'কপি করুন'}</span>
+                              </button>
+                            </div>
+                            <pre className="text-[10px] text-emerald-400 font-mono bg-slate-900 p-2 rounded overflow-x-auto max-h-36 select-all border border-slate-800">
+                              {supabaseSqlCode}
+                            </pre>
                           </div>
-                          <pre className="text-[10px] text-emerald-400 font-mono bg-slate-900 p-2 rounded overflow-x-auto max-h-36 select-all border border-slate-800">
-                            {supabaseSqlCode}
-                          </pre>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
 
               {/* Action Buttons Container */}
               <div className="pt-4 flex flex-col gap-3 border-t border-slate-800">

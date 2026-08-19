@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatDDMMYYYY } from '../lib/dateUtils';
 
 interface MemberPassbookProps {
   txs: any[];
@@ -76,7 +77,7 @@ export const MemberPassbook: React.FC<MemberPassbookProps> = ({ txs }) => {
                 >
                   {/* Date Column */}
                   <td className="p-2 sm:p-2.5 font-mono text-center text-slate-600 border-r border-slate-150">
-                    {tx.date}
+                    {formatDDMMYYYY(tx.date)}
                   </td>
 
                   {/* Amount Column - Styled in blue and bold like the screenshot links */}
