@@ -516,7 +516,6 @@ export default function LoginScreen({ organizations, onLoginSuccess }: LoginScre
 
       <div className="flex-1 flex flex-col justify-center items-center p-4 w-full">
         {/* Visual Header / লগো */}
-        <PwaInstallBanner />
         <div className="flex flex-col items-center mb-6">
           <TanzilLogo size={130} iconMode={true} className="mb-3 hover:scale-105 transition-transform duration-300" />
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-800 tracking-tight text-center">
