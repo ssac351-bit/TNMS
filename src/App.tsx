@@ -15,6 +15,7 @@ import { db } from './lib/firebase';
 import { collection, getDocs, doc, setDoc, deleteDoc, getDocFromServer } from 'firebase/firestore';
 import { saveToSupabase, deleteFromSupabase } from './lib/supabase';
 import { hydrateOrgFromCloud, hydrateAllOrgsFromCloud } from './lib/cloudAutoSync';
+import { PwaFloatingButton } from './components/PwaFloatingButton';
 
 export default function App() {
   // Authentication states
@@ -360,67 +361,46 @@ export default function App() {
     setOrganizations(prev => prev.map(o => o.id === updatedOrg.id ? updatedOrg : o));
   };
 
-  // ROUTER CONTROLS
-  if (isLoggedIn) {
-    if (userRole === 'super_admin') {
-      return (
-        <SuperAdminDashboard 
-          organizations={organizations}
-          setOrganizations={setOrganizations}
-          onLogout={handleLogout}
-        />
-      );
-    } else if (userRole === 'org_admin' && activeOrg) {
-      return (
-        <OrgAdminDashboard 
-          org={activeOrg}
-          onLogout={handleLogout}
-          onUpdateOrg={handleUpdateOrg}
-        />
-      );
-    } else if (userRole === 'bm' && activeOrg && activeStaff) {
-      return (
-        <BranchManagerDashboard
-          org={activeOrg}
-          staff={activeStaff}
-          onLogout={handleLogout}
-        />
-      );
-    } else if (userRole === 'staff' && activeOrg && activeStaff) {
-      return (
-        <BranchManagerDashboard
-          org={activeOrg}
-          staff={activeStaff}
-          onLogout={handleLogout}
-        />
-      );
-    } else if (userRole === 'member' && activeOrg && activeMember) {
-      return (
-        <MemberDashboard
-          org={activeOrg}
-          member={activeMember}
-          onLogout={handleLogout}
-        />
-      );
-    }
-  }
-
-  // Fallback to beautiful dual Login Screen
-  if (loadingOrgs) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-100">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-slate-600 font-bold">সিস্টেম লোড হচ্ছে...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <LoginScreen 
-      organizations={organizations}
-      onLoginSuccess={handleLoginSuccess}
-    />
+    <>
+      {isLoggedIn ? (
+        userRole === 'super_admin' ? (
+          <SuperAdminDashboard 
+            organizations={organizations}
+            setOrganizations={setOrganizations}
+            onLogout={handleLogout}
+          />
+        ) : userRole === 'org_admin' && activeOrg ? (
+          <OrgAdminDashboard 
+            org={activeOrg}
+            onLogout={handleLogout}
+            onUpdateOrg={handleUpdateOrg}
+          />
+        ) : (userRole === 'bm' || userRole === 'staff') && activeOrg && activeStaff ? (
+          <BranchManagerDashboard
+            org={activeOrg}
+            staff={activeStaff}
+            onLogout={handleLogout}
+          />
+        ) : userRole === 'member' && activeOrg && activeMember ? (
+          <MemberDashboard
+            org={activeOrg}
+            member={activeMember}
+            onLogout={handleLogout}
+          />
+        ) : (
+          <LoginScreen 
+            organizations={organizations}
+            onLoginSuccess={handleLoginSuccess}
+          />
+        )
+      ) : (
+        <LoginScreen 
+          organizations={organizations}
+          onLoginSuccess={handleLoginSuccess}
+        />
+      )}
+      <PwaFloatingButton />
+    </>
   );
 }

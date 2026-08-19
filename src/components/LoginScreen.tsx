@@ -507,9 +507,11 @@ export default function LoginScreen({ organizations, onLoginSuccess }: LoginScre
           <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></div>
           <span>তানজিল মাইক্রোক্রেডিট সফটওয়্যার (Tanzil Microcredit Software)</span>
         </div>
-        <span className="text-[9px] sm:text-[10px] text-slate-400 font-normal">
-          অফিসিয়াল লগইন পেজ
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="hidden sm:inline text-[10px] text-slate-400 font-normal">
+            অফিসিয়াল লগইন পেজ
+          </span>
+        </div>
       </div>
 
       <div className="flex-1 flex flex-col justify-center items-center p-4 w-full">
