@@ -1,20 +1,22 @@
-import {StrictMode} from 'react';
-import {createRoot} from 'react-dom/client';
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
+import { registerSW } from 'virtual:pwa-register';
 
-// Register Service Worker for PWA / App download capabilities (PWA Enabled)
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch((err) => {
-      console.log('SW registration failed: ', err);
-    });
-  });
-}
+// Register Service Worker for PWA (WebAPK and Offline Support)
+registerSW({
+  immediate: true,
+  onNeedRefresh() {
+    console.log('App update available');
+  },
+  onOfflineReady() {
+    console.log('App ready to work offline');
+  },
+});
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />
   </StrictMode>,
 );
-
