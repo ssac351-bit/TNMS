@@ -15,6 +15,14 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>তানজিল মাইক্রোক্রেডিট সফটওয়্যার (Tanzil Microfinance)</title>
+    <script>
+      window.deferredInstallPrompt = null;
+      window.addEventListener('beforeinstallprompt', function(e) {
+        e.preventDefault();
+        window.deferredInstallPrompt = e;
+        window.dispatchEvent(new CustomEvent('pwa_prompt_ready'));
+      });
+    </script>
   </head>
   <body>
     <div id="root"></div>
