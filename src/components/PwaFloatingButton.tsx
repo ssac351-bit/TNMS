@@ -1,11 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Download } from 'lucide-react';
-import { PwaInstallModal } from './PwaInstallModal';
 
 export const PwaFloatingButton: React.FC = () => {
   const [deferredPrompt, setDeferredPrompt] = useState<any>((window as any).deferredInstallPrompt || null);
-  const [showModal, setShowModal] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
+  const [showToast, setShowToast] = useState(false);
 
   useEffect(() => {
     // Check if app is already running in standalone / installed mode
@@ -14,7 +13,7 @@ export const PwaFloatingButton: React.FC = () => {
       return;
     }
 
-    // Check if early event was already caught
+    // Check if early event was already captured
     if ((window as any).deferredInstallPrompt) {
       setDeferredPrompt((window as any).deferredInstallPrompt);
     }
@@ -46,8 +45,6 @@ export const PwaFloatingButton: React.FC = () => {
     // Check if running inside an iframe (like AI Studio preview)
     const isIframe = typeof window !== 'undefined' && window.self !== window.top;
     if (isIframe) {
-      // In an iframe, browser security blocks direct PWA installation prompt.
-      // Open the direct full-screen tab so native installation prompt triggers immediately!
       window.open(window.location.href, '_blank');
       return;
     }
@@ -62,11 +59,11 @@ export const PwaFloatingButton: React.FC = () => {
         }
       } catch (err) {
         console.warn('Install prompt error:', err);
-        setShowModal(true);
       }
     } else {
-      // If native prompt is not yet ready, show help modal
-      setShowModal(true);
+      // Show brief floating toast if browser is still initializing WebAPK
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 4000);
     }
   };
 
@@ -89,12 +86,14 @@ export const PwaFloatingButton: React.FC = () => {
         <span className="sm:hidden">অ্যাপ ইনস্টল</span>
       </button>
 
-      <PwaInstallModal
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
-        onNativeInstall={handleClick}
-        hasNativePrompt={!!(deferredPrompt || (window as any).deferredInstallPrompt)}
-      />
+      {showToast && (
+        <div className="fixed bottom-16 right-4 z-50 bg-slate-900/95 text-white text-xs px-4 py-3 rounded-2xl shadow-2xl border border-slate-700 animate-in fade-in slide-in-from-bottom-2 duration-200 max-w-xs">
+          <p className="font-bold text-emerald-400 mb-0.5">অ্যান্ড্রয়েড ইনস্টল ডায়ালগ</p>
+          <p className="text-slate-300 text-[11px]">
+            ব্রাউজার মেনুর <strong>৩টি ডট (⋮)</strong> থেকে <strong>"Install app"</strong> চাপলেও সরাসরি ফোনে লোগোসহ ইনস্টল হবে।
+          </p>
+        </div>
+      )}
     </>
   );
 };
