@@ -13,13 +13,14 @@ export default defineConfig(() => {
         registerType: 'autoUpdate',
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'icon.png', 'pwa-192x192.png', 'pwa-512x512.png'],
         manifest: {
-          name: 'Tanzil Microcredit Software (TCSMS)',
+          id: '/',
+          name: 'তানজিল মাইক্রোক্রেডিট সফটওয়্যার (TCSMS)',
           short_name: 'TCSMS',
           description: 'Tanzil Microcredit and Cooperative Management System',
           theme_color: '#0a4635',
           background_color: '#0a4635',
           display: 'standalone',
-          orientation: 'portrait',
+          orientation: 'portrait-primary',
           start_url: '/',
           scope: '/',
           icons: [
