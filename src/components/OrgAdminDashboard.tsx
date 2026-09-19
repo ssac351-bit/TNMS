@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Building, 
   UserCheck, 
@@ -75,10 +75,14 @@ export default function OrgAdminDashboard({ org, onLogout, onUpdateOrg }: OrgAdm
     return saved ? JSON.parse(saved) : [];
   });
 
+  const hasAutoRestoredRef = useRef(false);
+
   // Automatically restore from cloud if local data is missing
   useEffect(() => {
     async function autoRestore() {
+      if (hasAutoRestoredRef.current) return;
       if (branchesList.length === 0) {
+        hasAutoRestoredRef.current = true;
         try {
           const { getDocs, collection, query, where } = await import('firebase/firestore');
           const { db } = await import('../lib/firebase');
@@ -256,8 +260,12 @@ export default function OrgAdminDashboard({ org, onLogout, onUpdateOrg }: OrgAdm
               localStorage.setItem(`tanzil_${k}_${org.id}`, String(val));
             });
             
-            // Reload UI to reflect newly loaded states
-            window.location.reload();
+            // Seamlessly update React state without disruptive window reload loops
+            if (mergedBranches.length > 0) {
+              setBranchesList(mergedBranches);
+            }
+            window.dispatchEvent(new Event('storage'));
+            window.dispatchEvent(new CustomEvent('tanzil_data_synced'));
           }
         } catch (e: any) {
           if (e?.message?.includes('offline') || !navigator.onLine) {
@@ -269,7 +277,7 @@ export default function OrgAdminDashboard({ org, onLogout, onUpdateOrg }: OrgAdm
       }
     }
     autoRestore();
-  }, [branchesList.length, org.id, org.adminId]);
+  }, [org.id]);
 
   const [staffList, setStaffList] = useState<Staff[]>(() => {
     const saved = localStorage.getItem(`tanzil_staff_${org.id}`);

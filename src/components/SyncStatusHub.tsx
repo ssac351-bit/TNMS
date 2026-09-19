@@ -453,11 +453,6 @@ GRANT USAGE ON SCHEMA public TO anon, authenticated;`;
         window.dispatchEvent(new CustomEvent('tanzil_data_synced', { detail: serverData }));
         
         console.log("Real-time cloud database snapshot successfully applied!");
-        
-        // Safe hot reload to reflect data flawlessly across view matrices
-        setTimeout(() => {
-          window.location.reload();
-        }, 1200);
       }
     }, (error) => {
       if (error?.message?.includes('offline') || !navigator.onLine) {
@@ -642,10 +637,9 @@ GRANT USAGE ON SCHEMA public TO anon, authenticated;`;
       setSuccessMsg(`ক্লাউড থেকে সফলভাবে ইউজার (${userName || 'অ্যাডমিন'}) এর সকল ডাটা পুনরুদ্ধার করা হয়েছে ও লোকাল স্টোরেজ আপডেট হয়েছে!`);
       loadLocalStats();
 
-      // Dispatch a storage event or refresh to trigger component re-render
-      setTimeout(() => {
-        window.location.reload();
-      }, 1500);
+      // Dispatch storage events to trigger component re-render without reloading the page
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new CustomEvent('tanzil_data_synced'));
 
     } catch (err: any) {
       console.error('Firestore restore failed:', err);
