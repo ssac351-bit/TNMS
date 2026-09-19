@@ -38,7 +38,8 @@ import {
   ChevronRight,
   RotateCcw,
   Upload,
-  CheckCircle
+  CheckCircle,
+  Coins
 } from 'lucide-react';
 import { Organization, Staff, Branch, Holiday, Group, LoanProductConfig } from '../types';
 import SyncStatusHub from './SyncStatusHub';
@@ -361,7 +362,7 @@ export default function OrgAdminDashboard({ org, onLogout, onUpdateOrg }: OrgAdm
   }, [holidaysList, org.id]);
 
   // Custom sub-tab for Configuration Panel
-  const [configSubTab, setConfigSubTab] = useState<'general' | 'loan-scheme'>('general');
+  const [configSubTab, setConfigSubTab] = useState<'general' | 'loan-scheme' | 'share-policy'>('general');
 
   // Custom dialog confirmation & alert states (Iframe safe)
   const [confirmModal, setConfirmModal] = useState<{
@@ -548,6 +549,10 @@ export default function OrgAdminDashboard({ org, onLogout, onUpdateOrg }: OrgAdm
   // Cooperative Share Capital settings
   const [sharePriceConfig, setSharePriceConfig] = useState(() => localStorage.getItem(`tanzil_share_price_${org.id}`) || '১০');
   const [minShareCountConfig, setMinShareCountConfig] = useState(() => localStorage.getItem(`tanzil_min_shares_${org.id}`) || '১');
+  const [maxShareCountConfig, setMaxShareCountConfig] = useState(() => localStorage.getItem(`tanzil_max_shares_${org.id}`) || '১০০');
+  const [dividendRateConfig, setDividendRateConfig] = useState(() => localStorage.getItem(`tanzil_dividend_rate_${org.id}`) || '১০');
+  const [dividendPayoutMethodConfig, setDividendPayoutMethodConfig] = useState(() => localStorage.getItem(`tanzil_dividend_payout_${org.id}`) || 'সরাসরি সাধারণ সঞ্চয়ে (GS) জমা');
+  const [shareRefundPolicyConfig, setShareRefundPolicyConfig] = useState(() => localStorage.getItem(`tanzil_share_refund_${org.id}`) || 'সদস্যপদ অবসান বা পদত্যাগে ফেরতযোগ্য');
 
   // Loan Insurance fields (বিতরণকৃত আসলের % এবং যৌথ/একক বীমা)
   const [loanInsurancePercent, setLoanInsurancePercent] = useState(() => localStorage.getItem(`tanzil_loan_ins_percent_${org.id}`) || '১');
@@ -978,6 +983,10 @@ export default function OrgAdminDashboard({ org, onLogout, onUpdateOrg }: OrgAdm
     localStorage.setItem(`tanzil_sav_welfare_fee_${org.id}`, savingsWelfareFee);
     localStorage.setItem(`tanzil_share_price_${org.id}`, sharePriceConfig);
     localStorage.setItem(`tanzil_min_shares_${org.id}`, minShareCountConfig);
+    localStorage.setItem(`tanzil_max_shares_${org.id}`, maxShareCountConfig);
+    localStorage.setItem(`tanzil_dividend_rate_${org.id}`, dividendRateConfig);
+    localStorage.setItem(`tanzil_dividend_payout_${org.id}`, dividendPayoutMethodConfig);
+    localStorage.setItem(`tanzil_share_refund_${org.id}`, shareRefundPolicyConfig);
 
     // Loan Insurance settings
     localStorage.setItem(`tanzil_loan_ins_percent_${org.id}`, loanInsurancePercent);
@@ -997,6 +1006,23 @@ export default function OrgAdminDashboard({ org, onLogout, onUpdateOrg }: OrgAdm
 
     alert('কনফিগারেশন সফলভাবে সংরক্ষণ করা হয়েছে!');
     setConfigSuccessMsg('কনফিগারেশন সফলভাবে সংরক্ষণ করা হয়েছে!');
+    setTimeout(() => {
+      setConfigSuccessMsg('');
+    }, 4000);
+  };
+
+  // Dedicated Save Handler for Cooperative Share Capital & Dividend Policy
+  const handleSaveShareConfig = (e: React.FormEvent) => {
+    e.preventDefault();
+    localStorage.setItem(`tanzil_share_price_${org.id}`, sharePriceConfig);
+    localStorage.setItem(`tanzil_min_shares_${org.id}`, minShareCountConfig);
+    localStorage.setItem(`tanzil_max_shares_${org.id}`, maxShareCountConfig);
+    localStorage.setItem(`tanzil_dividend_rate_${org.id}`, dividendRateConfig);
+    localStorage.setItem(`tanzil_dividend_payout_${org.id}`, dividendPayoutMethodConfig);
+    localStorage.setItem(`tanzil_share_refund_${org.id}`, shareRefundPolicyConfig);
+
+    alert('সমবায় শেয়ার মূলধন ও লভ্যাংশ পলিসি কনফিগারেশন সফলভাবে সংরক্ষণ করা হয়েছে!');
+    setConfigSuccessMsg('সমবায় শেয়ার মূলধন ও লভ্যাংশ পলিসি কনফিগারেশন সফলভাবে সংরক্ষণ করা হয়েছে!');
     setTimeout(() => {
       setConfigSuccessMsg('');
     }, 4000);
@@ -2025,11 +2051,11 @@ export default function OrgAdminDashboard({ org, onLogout, onUpdateOrg }: OrgAdm
               </div>
 
               {/* Elegant Sub-tabs inside Configuration panel */}
-              <div className="flex border-b border-slate-200 gap-2 mb-4 select-none">
+              <div className="flex border-b border-slate-200 gap-1.5 sm:gap-2 mb-4 select-none overflow-x-auto no-scrollbar pb-0.5">
                 <button
                   type="button"
                   onClick={() => setConfigSubTab('general')}
-                  className={`px-4 py-2 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+                  className={`px-3 sm:px-4 py-2 text-xs font-bold border-b-2 whitespace-nowrap transition-all cursor-pointer ${
                     configSubTab === 'general'
                       ? 'border-blue-600 text-blue-600 font-extrabold'
                       : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
@@ -2040,7 +2066,7 @@ export default function OrgAdminDashboard({ org, onLogout, onUpdateOrg }: OrgAdm
                 <button
                   type="button"
                   onClick={() => setConfigSubTab('loan-scheme')}
-                  className={`px-4 py-2 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+                  className={`px-3 sm:px-4 py-2 text-xs font-bold border-b-2 whitespace-nowrap transition-all cursor-pointer ${
                     configSubTab === 'loan-scheme'
                       ? 'border-blue-600 text-blue-600 font-extrabold'
                       : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
@@ -2048,9 +2074,21 @@ export default function OrgAdminDashboard({ org, onLogout, onUpdateOrg }: OrgAdm
                 >
                   ২. লোন প্রোডাক্ট ও স্কিম সেটিংস
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setConfigSubTab('share-policy')}
+                  className={`px-3 sm:px-4 py-2 text-xs font-bold border-b-2 whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+                    configSubTab === 'share-policy'
+                      ? 'border-emerald-600 text-emerald-700 font-extrabold bg-emerald-50/70 rounded-t-lg'
+                      : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
+                  }`}
+                >
+                  <Coins size={13} className={configSubTab === 'share-policy' ? 'text-emerald-600' : 'text-slate-400'} />
+                  <span>৩. শেয়ার মূলধন ও লভ্যাংশ সেটিংস ({sharePriceConfig}৳)</span>
+                </button>
               </div>
 
-              {configSubTab === 'general' ? (
+              {configSubTab === 'general' && (
                 <div className="space-y-6 animate-in fade-in duration-200">
                   {configSuccessMsg && (
                     <div id="config-success-toast" className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold animate-in fade-in slide-in-from-top-2 duration-200 flex items-center gap-2">
@@ -2463,7 +2501,9 @@ export default function OrgAdminDashboard({ org, onLogout, onUpdateOrg }: OrgAdm
                 </div>
               </form>
             </div>
-          ) : (
+          )}
+
+          {configSubTab === 'loan-scheme' && (
             <div className="space-y-6 animate-in fade-in duration-200">
               <div className="border-b border-slate-100 pb-4">
                 <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
@@ -3068,6 +3108,264 @@ export default function OrgAdminDashboard({ org, onLogout, onUpdateOrg }: OrgAdm
                   </div>
                 </form>
               </div>
+            </div>
+          )}
+
+          {/* TAB 3: COOPERATIVE SHARE CAPITAL & DIVIDEND POLICY PANEL */}
+          {configSubTab === 'share-policy' && (
+            <div className="space-y-6 animate-in fade-in duration-200">
+              <div className="border-b border-slate-100 pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <Coins className="text-emerald-600" size={20} />
+                    <span>সমবায় শেয়ার মূলধন ও লভ্যাংশ পলিসি কনফিগারেশন</span>
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    আপনার সমবায় সমিতির প্রতি শেয়ারের মূল্য (যেমন: ১০ টাকা), ভর্তিতে ন্যূনতম শেয়ার সংখ্যা, লভ্যাংশ বণ্টন নীতি ও প্রত্যাহারের নিয়মাবলী নির্ধারণ করুন।
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-xs font-bold flex items-center gap-1.5">
+                    <CheckCircle size={13} className="text-emerald-600" />
+                    <span>বর্তমান দর: ৳{sharePriceConfig} / শেয়ার</span>
+                  </span>
+                </div>
+              </div>
+
+              {configSuccessMsg && (
+                <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold animate-in fade-in slide-in-from-top-2 duration-200 flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping"></div>
+                  <span>{configSuccessMsg}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleSaveShareConfig} className="space-y-6">
+                <div className="grid gap-6 md:grid-cols-2">
+                  
+                  {/* Card 1: Share Face Value and Purchase Limits */}
+                  <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+                    <h4 className="text-[12px] font-bold uppercase tracking-wider text-emerald-900 flex items-center gap-1.5 border-b border-slate-100 pb-2.5">
+                      <Coins size={14} className="text-emerald-600" /> ১. শেয়ার মূল্য ও ক্রয় সীমা সেটিংস
+                    </h4>
+
+                    <div className="space-y-4">
+                      {/* Share Price */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-xs font-bold text-slate-700">
+                            প্রতি শেয়ারের অভিহিত মূল্য (Share Face Value) *
+                          </label>
+                          <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                            বর্তমান দর: {sharePriceConfig} টাকা
+                          </span>
+                        </div>
+                        <div className="relative">
+                          <span className="absolute left-3 top-2 text-sm text-slate-400 font-bold font-mono">৳</span>
+                          <input 
+                            type="text"
+                            className="w-full pl-8 pr-3 py-2 border-2 border-emerald-300 rounded-xl text-sm font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-emerald-50/20"
+                            value={sharePriceConfig}
+                            onChange={(e) => setSharePriceConfig(e.target.value)}
+                            placeholder="১০"
+                            required
+                          />
+                        </div>
+                        
+                        {/* Quick Presets */}
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className="text-[10px] text-slate-400 font-bold">দ্রুত সেট করুন:</span>
+                          {[
+                            { label: '১০ টাকা', val: '১০' },
+                            { label: '২০ টাকা', val: '২০' },
+                            { label: '৫০ টাকা', val: '৫০' },
+                            { label: '১০০ টাকা', val: '১০০' }
+                          ].map((item) => (
+                            <button
+                              key={item.val}
+                              type="button"
+                              onClick={() => setSharePriceConfig(item.val)}
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold border transition cursor-pointer ${
+                                sharePriceConfig === item.val
+                                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
+                                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-emerald-50 hover:text-emerald-700'
+                              }`}
+                            >
+                              {item.label}
+                            </button>
+                          ))}
+                        </div>
+                        <span className="text-[10px] text-slate-500 mt-1.5 block leading-relaxed">
+                          💡 নতুন সদস্য ভর্তি হওয়ার সময় এবং শেয়ার রেজিস্টারে স্বয়ংক্রিয়ভাবে প্রতি শেয়ারের এই দর কার্যকরী হবে।
+                        </span>
+                      </div>
+
+                      {/* Minimum Shares on Admission */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          সদস্য ভর্তির সময় ন্যূনতম শেয়ার সংখ্যা *
+                        </label>
+                        <div className="relative">
+                          <input 
+                            type="text"
+                            className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-white"
+                            value={minShareCountConfig}
+                            onChange={(e) => setMinShareCountConfig(e.target.value)}
+                            placeholder="১"
+                            required
+                          />
+                        </div>
+                        <span className="text-[10px] text-slate-400 mt-1 block">
+                          সমিতিতে সদস্যপদ গ্রহণের সময় ন্যূনতম ১টি শেয়ার ক্রয় বাধ্যতামূলক (মোট প্রাথমিক শেয়ার জমা: ৳{((Number(minShareCountConfig) || 1) * (Number(sharePriceConfig) || 10))})।
+                        </span>
+                      </div>
+
+                      {/* Maximum Share Limit */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          একক সদস্যের সর্বোচ্চ শেয়ার ধারণ সীমা (টি)
+                        </label>
+                        <div className="relative">
+                          <input 
+                            type="text"
+                            className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-white"
+                            value={maxShareCountConfig}
+                            onChange={(e) => setMaxShareCountConfig(e.target.value)}
+                            placeholder="১০০"
+                          />
+                        </div>
+                        <span className="text-[10px] text-slate-400 mt-1 block">
+                          সমবায় আইন মোতাবেক কোনো একক সদস্য মোট মূলধনের ২০% বা নির্দিষ্ট সংখ্যার অধিক শেয়ার কিনতে পারবেন না।
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 2: Dividend Distribution and Surrender Policy */}
+                  <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+                    <h4 className="text-[12px] font-bold uppercase tracking-wider text-emerald-900 flex items-center gap-1.5 border-b border-slate-100 pb-2.5">
+                      <Shield size={14} className="text-emerald-600" /> ২. লভ্যাংশ বণ্টন ও প্রত্যাহার নীতি
+                    </h4>
+
+                    <div className="space-y-4">
+                      {/* Dividend Rate */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          বাৎসরিক / মাসিক লভ্যাংশের প্রাক্কলিত হার (%) *
+                        </label>
+                        <div className="relative">
+                          <input 
+                            type="text"
+                            className="w-full pl-3 pr-8 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-white"
+                            value={dividendRateConfig}
+                            onChange={(e) => setDividendRateConfig(e.target.value)}
+                            placeholder="১০"
+                            required
+                          />
+                          <span className="absolute right-3 top-2 text-xs text-slate-400 font-bold">%</span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 mt-1 block">
+                          অর্থবছর শেষে অর্জিত নিট মুনাফা থেকে সাধারণ বার্ষিক সভায় (AGM) অনুমোদিত এই শতকরা হারে শেয়ার লভ্যাংশ বণ্টন হবে।
+                        </span>
+                      </div>
+
+                      {/* Dividend Payout Method */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          লভ্যাংশ ক্রেডিট / স্থানান্তরের মাধ্যম *
+                        </label>
+                        <select 
+                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-white"
+                          value={dividendPayoutMethodConfig}
+                          onChange={(e) => setDividendPayoutMethodConfig(e.target.value)}
+                        >
+                          <option value="সরাসরি সাধারণ সঞ্চয়ে (GS) জমা">সরাসরি সাধারণ সঞ্চয়ে (GS) জমা (অটো ডিপোজিট)</option>
+                          <option value="নগদ ভাউচারে (Cash Voucher) উত্তোলন">নগদ ভাউচারে (Cash Voucher) সরাসরি উত্তোলন</option>
+                          <option value="অতিরিক্ত শেয়ারে পুনঃবিনিয়োগ (Re-invest)">লভ্যাংশ দিয়ে নতুন শেয়ার ক্রয় (পুনঃবিনিয়োগ)</option>
+                        </select>
+                        <span className="text-[10px] text-slate-400 mt-1 block">
+                          লভ্যাংশ ঘোষিত হলে সদস্যের হিসাবে কীভাবে ক্রেডিট হবে তা নির্বাচন করুন।
+                        </span>
+                      </div>
+
+                      {/* Share Surrender & Refund Policy */}
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          শেয়ার ফেরত / প্রত্যাহার নীতি (Share Refund Rule) *
+                        </label>
+                        <select 
+                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-white"
+                          value={shareRefundPolicyConfig}
+                          onChange={(e) => setShareRefundPolicyConfig(e.target.value)}
+                        >
+                          <option value="সদস্যপদ অবসান বা পদত্যাগে ফেরতযোগ্য">সদস্যপদ অবসান বা পদত্যাগে সম্পূর্ণ ফেরতযোগ্য</option>
+                          <option value="কমপক্ষে ১ বছর নিয়মিত সদস্য থাকার পর ফেরতযোগ্য">কমপক্ষে ১ বছর নিয়মিত সদস্য থাকার পর ফেরতযোগ্য</option>
+                          <option value="ম্যানেজিং কমিটির অনুমোদন সাপেক্ষে যেকোনো সময় প্রত্যাহারযোগ্য">ম্যানেজিং কমিটির অনুমোদন সাপেক্ষে যেকোনো সময় প্রত্যাহারযোগ্য</option>
+                        </select>
+                        <span className="text-[10px] text-slate-400 mt-1 block">
+                          সদস্যের সদস্যপদ প্রত্যাহারকালে শেয়ারের জমাকৃত মূলধন ফেরত দেওয়ার নিয়ম।
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Card 3: Live Calculation Preview */}
+                <div className="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-5 space-y-3">
+                  <div className="flex items-center justify-between border-b border-emerald-200/80 pb-2">
+                    <h5 className="text-xs font-extrabold text-emerald-950 flex items-center gap-1.5">
+                      <CheckCircle size={14} className="text-emerald-600" />
+                      বর্তমান শেয়ার নীতি লাইভ প্রাক্কলন (Live Calculation Simulation)
+                    </h5>
+                    <span className="text-[10px] font-bold text-emerald-700 bg-white px-2 py-0.5 rounded-full border border-emerald-200 shadow-3xs">
+                      প্রতি শেয়ার = ৳{Number(sharePriceConfig) || 10}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5 pt-1">
+                    <div className="bg-white p-3 rounded-xl border border-emerald-100 shadow-3xs text-center">
+                      <span className="text-[9px] text-slate-400 font-bold block uppercase">১টি শেয়ার</span>
+                      <span className="text-sm font-black text-emerald-700 font-mono">৳{Number(sharePriceConfig) || 10}</span>
+                    </div>
+                    <div className="bg-white p-3 rounded-xl border border-emerald-100 shadow-3xs text-center">
+                      <span className="text-[9px] text-slate-400 font-bold block uppercase">ভর্তিতে জমা</span>
+                      <span className="text-sm font-black text-emerald-700 font-mono">৳{((Number(minShareCountConfig) || 1) * (Number(sharePriceConfig) || 10)).toLocaleString('en-IN')}</span>
+                    </div>
+                    <div className="bg-white p-3 rounded-xl border border-emerald-100 shadow-3xs text-center">
+                      <span className="text-[9px] text-slate-400 font-bold block uppercase">১০টি শেয়ার</span>
+                      <span className="text-sm font-black text-emerald-700 font-mono">৳{(10 * (Number(sharePriceConfig) || 10)).toLocaleString('en-IN')}</span>
+                    </div>
+                    <div className="bg-white p-3 rounded-xl border border-emerald-100 shadow-3xs text-center">
+                      <span className="text-[9px] text-slate-400 font-bold block uppercase">৫০টি শেয়ার</span>
+                      <span className="text-sm font-black text-emerald-700 font-mono">৳{(50 * (Number(sharePriceConfig) || 10)).toLocaleString('en-IN')}</span>
+                    </div>
+                    <div className="bg-white p-3 rounded-xl border border-emerald-100 shadow-3xs text-center">
+                      <span className="text-[9px] text-slate-400 font-bold block uppercase">১০০টি শেয়ার</span>
+                      <span className="text-sm font-black text-emerald-700 font-mono">৳{(100 * (Number(sharePriceConfig) || 10)).toLocaleString('en-IN')}</span>
+                    </div>
+                    <div className="bg-white p-3 rounded-xl border border-emerald-100 shadow-3xs text-center">
+                      <span className="text-[9px] text-slate-400 font-bold block uppercase">১০০ শেয়ারে লভ্যাংশ</span>
+                      <span className="text-sm font-black text-indigo-700 font-mono">৳{Math.round(((100 * (Number(sharePriceConfig) || 10)) * (Number(dividendRateConfig) || 10)) / 100).toLocaleString('en-IN')}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Submit Action */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-3 border-t border-slate-100 gap-3">
+                  <span className="text-xs text-slate-500 font-medium">
+                    * এই সেটিং সংরক্ষণের সাথে সাথে সমগ্র সংস্থার সদস্য ভর্তি ফর্ম ও শেয়ার রেজিস্টারে সক্রিয় হবে।
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button 
+                      type="submit"
+                      className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-emerald-500/10 cursor-pointer border-0 w-full sm:w-auto"
+                    >
+                      <Save size={14} />
+                      <span>শেয়ার পলিসি কনফিগারেশন সংরক্ষণ করুন</span>
+                    </button>
+                  </div>
+                </div>
+              </form>
             </div>
           )}
         </div>
