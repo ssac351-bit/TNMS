@@ -181,7 +181,7 @@ export default function MemberDashboard({ org, member: initialMember, onLogout }
   };
 
   // Calculations
-  const sharePrice = Number(localStorage.getItem(`tanzil_share_price_${org.id}`)) || 100;
+  const sharePrice = Number(localStorage.getItem(`tanzil_share_price_${org.id}`)) || 10;
   const shareCount = Number((member as any).shareCount) || 1;
   const shareVal = Number((member as any).shareBalance) || (shareCount * sharePrice);
 

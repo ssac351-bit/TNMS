@@ -99,7 +99,7 @@ interface BranchManagerDashboardProps {
 
 export default function BranchManagerDashboard({ org, staff, onLogout, isSimulated }: BranchManagerDashboardProps) {
   const isBM = staff.designation === 'শাখা ব্যবস্থাপক';
-  const isRealBMReadOnly = !isSimulated && staff.designation === 'শাখা ব্যবস্থাপক';
+  const isRealBMReadOnly = false; // BM has full permission to add and manage branch groups and operations
   console.log("staff designation:", staff.designation, "isBM:", isBM, "isRealBMReadOnly:", isRealBMReadOnly);
 
   // Working day retrieved from localStorage (Branch-specific, isolated for simulated admin overview)
@@ -3919,158 +3919,137 @@ export default function BranchManagerDashboard({ org, staff, onLogout, isSimulat
                   {/* Integrated Grid Layout */}
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                     
-                    {/* Left Column: Add / Edit Form (lg:col-span-5) */}
+                      {/* Left Column: Add / Edit Form (lg:col-span-5) */}
                     <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6">
-                      {isSimulated ? (
-                        <>
-                          <div className="flex items-center gap-2 pb-3 mb-4 border-b border-slate-100">
-                            <div className={`w-2 h-2 rounded-full ${isGroupEditMode ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`}></div>
-                            <h3 className="font-extrabold text-slate-800 text-sm">
-                              {isGroupEditMode ? 'গ্রুপ তথ্য সংশোধন করুন' : 'নতুন গ্রুপ যুক্ত করুন (Add Group)'}
-                            </h3>
+                      <>
+                        <div className="flex items-center gap-2 pb-3 mb-4 border-b border-slate-100">
+                          <div className={`w-2 h-2 rounded-full ${isGroupEditMode ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`}></div>
+                          <h3 className="font-extrabold text-slate-800 text-sm">
+                            {isGroupEditMode ? 'গ্রুপ তথ্য সংশোধন করুন' : 'নতুন গ্রুপ যুক্ত করুন (Add Group)'}
+                          </h3>
+                        </div>
+
+                        {isGroupEditMode && (
+                          <div className="mb-4 bg-amber-50 border border-amber-200/60 text-amber-800 px-3 py-2 rounded-xl text-[11px] font-bold flex justify-between items-center">
+                            <span>⚠️ আপনি বর্তমানে গ্রুপটি সম্পাদন (Edit) করছেন।</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsGroupEditMode(false);
+                                setEditingGroupId(null);
+                                setGroupNameInput('');
+                                setGroupCodeInput('');
+                                setGroupStaffSelect(`ILO-${currentBranchCode}`);
+                                setGroupMeetingDayInput('শনিবার');
+                                setGroupVillageInput('');
+                              }}
+                              className="text-[10px] underline hover:text-amber-950 cursor-pointer"
+                            >
+                              নতুন গ্রুপ মোডে যান
+                            </button>
+                          </div>
+                        )}
+
+                        <form onSubmit={handleSaveGroup} className="space-y-4">
+                          <div>
+                            <label className="block text-xs font-bold text-slate-500 mb-1.5">গ্রুপের নাম (Samity Name) *</label>
+                            <input 
+                              type="text"
+                              placeholder="যেমন: পদ্মা সমিতি"
+                              value={groupNameInput}
+                              onChange={(e) => setGroupNameInput(e.target.value)}
+                              className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs sm:text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-bold"
+                              required
+                            />
                           </div>
 
-                          {isGroupEditMode && (
-                            <div className="mb-4 bg-amber-50 border border-amber-200/60 text-amber-800 px-3 py-2 rounded-xl text-[11px] font-bold flex justify-between items-center">
-                              <span>⚠️ আপনি বর্তমানে গ্রুপটি সম্পাদন (Edit) করছেন।</span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setIsGroupEditMode(false);
-                                  setEditingGroupId(null);
-                                  setGroupNameInput('');
-                                  setGroupCodeInput('');
-                                  setGroupStaffSelect(`ILO-${currentBranchCode}`);
-                                  setGroupMeetingDayInput('শনিবার');
-                                  setGroupVillageInput('');
-                                }}
-                                className="text-[10px] underline hover:text-amber-950 cursor-pointer"
-                              >
-                                নতুন গ্রুপ মোডে যান
-                              </button>
-                            </div>
-                          )}
+                          <div>
+                            <label className="block text-xs font-bold text-slate-500 mb-1.5">গ্রুপ কোড (Group Code) *</label>
+                            <input 
+                              type="text"
+                              placeholder="যেমন: GRP-001"
+                              value={groupCodeInput}
+                              onChange={(e) => setGroupCodeInput(e.target.value)}
+                              className={`w-full px-3.5 py-2 border rounded-xl text-xs sm:text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono font-bold ${!isGroupEditMode ? 'bg-slate-50 border-slate-200 text-slate-500' : 'border-slate-200 bg-white'}`}
+                              required
+                            />
+                            {!isGroupEditMode && (
+                              <p className="text-[10px] text-slate-400 mt-1 font-semibold font-sans">সমিতির গ্রুপ কোড স্বয়ংক্রিয়ভাবে তৈরি হয়েছে (প্রয়োজনে পরিবর্তন করতে পারেন)।</p>
+                            )}
+                          </div>
 
-                          <form onSubmit={handleSaveGroup} className="space-y-4">
-                            <div>
-                              <label className="block text-xs font-bold text-slate-500 mb-1.5">গ্রুপের নাম (Samity Name) *</label>
-                              <input 
-                                type="text"
-                                placeholder="যেমন: পদ্মা সমিতি"
-                                value={groupNameInput}
-                                onChange={(e) => setGroupNameInput(e.target.value)}
-                                className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs sm:text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-bold"
-                                required
-                              />
-                            </div>
+                          <div>
+                            <label className="block text-xs font-bold text-slate-500 mb-1.5">দায়িত্বপ্রাপ্ত মাঠ কর্মকর্তা *</label>
+                            <select
+                              value={groupStaffSelect}
+                              onChange={(e) => setGroupStaffSelect(e.target.value)}
+                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs sm:text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-white font-bold text-slate-700"
+                            >
+                              {staffList
+                                .filter((s) => s.branchId === staff.branchId)
+                                .map((s) => (
+                                  <option key={s.id} value={s.staffId}>
+                                    {s.name} ({s.designation || 'মাঠ কর্মী'})
+                                  </option>
+                                ))}
+                            </select>
+                          </div>
 
+                          <div className="grid grid-cols-2 gap-3">
                             <div>
-                              <label className="block text-xs font-bold text-slate-500 mb-1.5">গ্রুপ কোড (Group Code) *</label>
-                              <input 
-                                type="text"
-                                placeholder="যেমন: GRP-001"
-                                value={groupCodeInput}
-                                onChange={(e) => setGroupCodeInput(e.target.value)}
-                                className={`w-full px-3.5 py-2 border rounded-xl text-xs sm:text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono font-bold ${!isGroupEditMode ? 'bg-slate-50 border-slate-200 text-slate-500 cursor-not-allowed' : 'border-slate-200 bg-white'}`}
-                                disabled={!isGroupEditMode}
-                                required
-                              />
-                              {!isGroupEditMode && (
-                                <p className="text-[10px] text-slate-400 mt-1 font-semibold font-sans">সমিতির গ্রুপ কোড সিস্টেম কর্তৃক স্বয়ংক্রিয়ভাবে তৈরি হয়েছে।</p>
-                              )}
-                            </div>
-
-                            <div>
-                              <label className="block text-xs font-bold text-slate-500 mb-1.5">দায়িত্বপ্রাপ্ত মাঠ কর্মকর্তা *</label>
+                              <label className="block text-xs font-bold text-slate-500 mb-1.5">বৈঠকের দিন *</label>
                               <select
-                                value={groupStaffSelect}
-                                onChange={(e) => setGroupStaffSelect(e.target.value)}
-                                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs sm:text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-white font-bold text-slate-700"
+                                value={groupMeetingDayInput}
+                                onChange={(e) => setGroupMeetingDayInput(e.target.value)}
+                                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs sm:text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-white font-bold"
                               >
-                                {staffList
-                                  .filter((s) => s.branchId === staff.branchId)
-                                  .map((s) => (
-                                    <option key={s.id} value={s.staffId}>
-                                      {s.name} ({s.designation || 'মাঠ কর্মী'})
-                                    </option>
-                                  ))}
+                                <option value="শনিবার">শনিবার</option>
+                                <option value="রবিবার">রবিবার</option>
+                                <option value="সোমবার">সোমবার</option>
+                                <option value="মঙ্গলবার">মঙ্গলবার</option>
+                                <option value="বুধবার">বুধবার</option>
+                                <option value="বৃহস্পতিবার">বৃহস্পতিবার</option>
+                                <option value="শুক্রবার">শুক্রবার</option>
                               </select>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-3">
-                              <div>
-                                <label className="block text-xs font-bold text-slate-500 mb-1.5">বৈঠকের দিন *</label>
-                                <select
-                                  value={groupMeetingDayInput}
-                                  onChange={(e) => setGroupMeetingDayInput(e.target.value)}
-                                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs sm:text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 bg-white font-bold"
-                                >
-                                  <option value="শনিবার">শনিবার</option>
-                                  <option value="রবিবার">রবিবার</option>
-                                  <option value="সোমবার">সোমবার</option>
-                                  <option value="মঙ্গলবার">মঙ্গলবার</option>
-                                  <option value="বুধবার">বুধবার</option>
-                                  <option value="বৃহস্পতিবার">বৃহস্পতিবার</option>
-                                  <option value="শুক্রবার">শুক্রবার</option>
-                                </select>
-                              </div>
-
-                              <div>
-                                <label className="block text-xs font-bold text-slate-500 mb-1.5">গ্রাম / এলাকা</label>
-                                <input 
-                                  type="text"
-                                  placeholder="যেমন: চাঁদপুর"
-                                  value={groupVillageInput}
-                                  onChange={(e) => setGroupVillageInput(e.target.value)}
-                                  className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs sm:text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-bold"
-                                />
-                              </div>
+                            <div>
+                              <label className="block text-xs font-bold text-slate-500 mb-1.5">গ্রাম / এলাকা</label>
+                              <input 
+                                type="text"
+                                placeholder="যেমন: চাঁদপুর"
+                                value={groupVillageInput}
+                                onChange={(e) => setGroupVillageInput(e.target.value)}
+                                className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs sm:text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-bold"
+                              />
                             </div>
+                          </div>
 
-                            <div className="flex gap-3 pt-2">
-                              <button 
-                                type="button" 
-                                onClick={() => {
-                                  setIsGroupEditMode(false);
-                                  setEditingGroupId(null);
-                                  setGroupNameInput('');
-                                  setGroupCodeInput('');
-                                  setGroupStaffSelect(`ILO-${currentBranchCode}`);
-                                  setGroupMeetingDayInput('শনিবার');
-                                  setGroupVillageInput('');
-                                }}
-                                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 transition-all rounded-xl text-xs font-bold text-slate-600 cursor-pointer"
-                              >
-                                ফর্ম পরিষ্কার করুন
-                              </button>
-                              <button 
-                                type="submit" 
-                                className="flex-1 py-2.5 bg-[#2f6ce5] hover:bg-[#1d59d1] transition-all text-white font-bold rounded-xl text-xs shadow-sm flex items-center justify-center gap-1 cursor-pointer"
-                              >
-                                {isGroupEditMode ? 'হালনাগাদ করুন' : 'গ্রুপ তৈরি করুন'}
-                              </button>
-                            </div>
-                          </form>
-                        </>
-                      ) : (
-                        <div className="flex flex-col items-center text-center py-8 px-4 font-sans space-y-4">
-                          <div className="w-12 h-12 bg-amber-500/10 border border-amber-500/20 rounded-full flex items-center justify-center text-amber-600 animate-pulse">
-                            <Lock size={22} className="stroke-[2.5]" />
+                          <div className="flex gap-3 pt-2">
+                            <button 
+                              type="button" 
+                              onClick={() => {
+                                setIsGroupEditMode(false);
+                                setEditingGroupId(null);
+                                setGroupNameInput('');
+                                setGroupCodeInput('');
+                                setGroupStaffSelect(`ILO-${currentBranchCode}`);
+                                setGroupMeetingDayInput('শনিবার');
+                                setGroupVillageInput('');
+                              }}
+                              className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 transition-all rounded-xl text-xs font-bold text-slate-600 cursor-pointer"
+                            >
+                              ফর্ম পরিষ্কার করুন
+                            </button>
+                            <button 
+                              type="submit" 
+                              className="flex-1 py-2.5 bg-[#2f6ce5] hover:bg-[#1d59d1] transition-all text-white font-bold rounded-xl text-xs shadow-sm flex items-center justify-center gap-1 cursor-pointer"
+                            >
+                              {isGroupEditMode ? 'হালনাগাদ করুন' : 'গ্রুপ তৈরি করুন'}
+                            </button>
                           </div>
-                          <div>
-                            <h4 className="font-extrabold text-slate-800 text-sm">গ্রুপ কার্যক্রম রিড-অনলি মোডে রয়েছে</h4>
-                            <p className="text-[11.5px] text-slate-500 mt-2.5 leading-relaxed font-medium">
-                              নিরাপত্তা ও নিয়ন্ত্রণ নীতি অনুযায়ী, শাখা ব্যবস্থাপক (BM) বা সাধারণ কোনো আইডি থেকে গ্রুপ বা সমিতি তৈরি, সংশোধন বা বাতিল করা অনুমোদিত নয়।
-                            </p>
-                            <p className="text-[11.2px] text-[#2f6ce5] font-extrabold mt-3">
-                              শুধুমাত্র প্রধান এডমিন (Org Admin) গ্রুপ কোড বরাদ্দ ও নতুন গ্রুপ তৈরি করতে পারবেন।
-                            </p>
-                          </div>
-                          <div className="w-full bg-slate-50 border border-slate-100 rounded-xl p-3.5 text-[10.5px] text-slate-500 font-semibold leading-relaxed">
-                            যেকোনো পরিবর্তনের জন্য দয়া করে প্রধান কার্যালয়ে এডমিনের সাথে যোগাযোগ করুন।
-                          </div>
-                        </div>
-                      )}
+                        </form>
+                      </>
                     </div>
 
                     {/* Right Column: Existing Group List with Real-time Search and Stats (lg:col-span-7) */}
@@ -4130,7 +4109,7 @@ export default function BranchManagerDashboard({ org, staff, onLogout, isSimulat
                               <th className="py-2.5 px-3">মাঠ কর্মী</th>
                               <th className="py-2.5 px-3">বৈঠক ও এলাকা</th>
                               <th className="py-2.5 px-3 text-center">অবস্থা</th>
-                              {isSimulated && <th className="py-2.5 px-3 text-center">অ্যাকশন</th>}
+                              <th className="py-2.5 px-3 text-center">অ্যাকশন</th>
                             </tr>
                           </thead>
                           <tbody className="text-slate-700 divide-y divide-slate-100">
@@ -4165,57 +4144,47 @@ export default function BranchManagerDashboard({ org, staff, onLogout, isSimulat
                                       <div className="text-[9px] text-slate-500 font-sans mt-0.5">{group.village || 'চাঁদপুর'}</div>
                                     </td>
                                     <td className="py-3 px-3 text-center">
-                                      {isSimulated ? (
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            const updatedGroups = groupList.map(g => 
-                                              g.id === group.id ? { ...g, isActive: g.isActive === false ? true : false } : g
-                                            );
-                                            setGroupList(updatedGroups);
-                                            setAlertMsg({ type: 'success', text: `"${group.name}" এর স্ট্যাটাস পরিবর্তন করা হয়েছে।` });
-                                          }}
-                                          className={`px-2.5 py-1 rounded-full font-black text-[9px] tracking-wide cursor-pointer transition-all border ${group.isActive === false ? 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100' : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'}`}
-                                        >
-                                          {group.isActive === false ? 'নিষ্ক্রিয়' : 'সক্রিয়'}
-                                        </button>
-                                      ) : (
-                                        <span
-                                          className={`px-2.5 py-1 rounded-full font-black text-[9px] tracking-wide border select-none ${group.isActive === false ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}
-                                        >
-                                          {group.isActive === false ? 'নিষ্ক্রিয়' : 'সক্রিয়'}
-                                        </span>
-                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const updatedGroups = groupList.map(g => 
+                                            g.id === group.id ? { ...g, isActive: g.isActive === false ? true : false } : g
+                                          );
+                                          setGroupList(updatedGroups);
+                                          setAlertMsg({ type: 'success', text: `"${group.name}" এর স্ট্যাটাস পরিবর্তন করা হয়েছে।` });
+                                        }}
+                                        className={`px-2.5 py-1 rounded-full font-black text-[9px] tracking-wide cursor-pointer transition-all border ${group.isActive === false ? 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100' : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'}`}
+                                      >
+                                        {group.isActive === false ? 'নিষ্ক্রিয়' : 'সক্রিয়'}
+                                      </button>
                                     </td>
-                                    {isSimulated && (
-                                      <td className="py-3 px-3 text-center">
-                                        <div className="flex items-center justify-center gap-1.5">
-                                          <button 
-                                            type="button"
-                                            onClick={() => openEditGroup(group)}
-                                            className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 hover:text-blue-800 rounded-lg transition-all cursor-pointer"
-                                            title="ইডিট করুন"
-                                          >
-                                            <Edit size={12} />
-                                          </button>
-                                          <button 
-                                            type="button"
-                                            onClick={() => handleDeleteGroup(group)}
-                                            className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-800 rounded-lg transition-all cursor-pointer"
-                                            title="ডিলিট করুন"
-                                          >
-                                            <Trash2 size={12} />
-                                          </button>
-                                        </div>
-                                      </td>
-                                    )}
+                                    <td className="py-3 px-3 text-center">
+                                      <div className="flex items-center justify-center gap-1.5">
+                                        <button 
+                                          type="button"
+                                          onClick={() => openEditGroup(group)}
+                                          className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 hover:text-blue-800 rounded-lg transition-all cursor-pointer"
+                                          title="ইডিট করুন"
+                                        >
+                                          <Edit size={12} />
+                                        </button>
+                                        <button 
+                                          type="button"
+                                          onClick={() => handleDeleteGroup(group)}
+                                          className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-800 rounded-lg transition-all cursor-pointer"
+                                          title="ডিলিট করুন"
+                                        >
+                                          <Trash2 size={12} />
+                                        </button>
+                                      </div>
+                                    </td>
                                   </tr>
                                 );
                               })}
 
                             {groupList.filter(g => g.branchId === staff.branchId).length === 0 && (
                               <tr>
-                                <td colSpan={isSimulated ? 5 : 4} className="py-8 text-center text-slate-400 font-bold text-xs font-sans">
+                                <td colSpan={5} className="py-8 text-center text-slate-400 font-bold text-xs font-sans">
                                   আপনার শাখায় কোনো গ্রুপ বা সমিতি খুঁজে পাওয়া যায়নি। বামদিকের ফর্ম ব্যবহার করে আপনার প্রথম গ্রুপটি যোগ করুন!
                                 </td>
                               </tr>
@@ -4237,7 +4206,7 @@ export default function BranchManagerDashboard({ org, staff, onLogout, isSimulat
                                 );
                               }).length === 0 && (
                               <tr>
-                                <td colSpan={isSimulated ? 5 : 4} className="py-8 text-center text-slate-400 font-bold text-xs font-sans">
+                                <td colSpan={5} className="py-8 text-center text-slate-400 font-bold text-xs font-sans">
                                   অনুসন্ধানকৃত তথ্য অনুযায়ী কোনো গ্রুপ খুঁজে পাওয়া যায়নি!
                                 </td>
                               </tr>

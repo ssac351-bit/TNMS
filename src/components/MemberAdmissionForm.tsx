@@ -82,9 +82,12 @@ export const MemberAdmissionForm: React.FC<MemberAdmissionFormProps> = ({
     return convertBanglaToEnglishNumber(rawVal);
   });
   // Cooperative Bylaws: Share Capital Admission Requirement
-  const [shareCount, setShareCount] = useState('1');
+  const [shareCount, setShareCount] = useState(() => {
+    const rawMin = org ? localStorage.getItem(`tanzil_min_shares_${org.id}`) || '১' : '১';
+    return convertBanglaToEnglishNumber(rawMin) || '1';
+  });
   const [sharePrice, setSharePrice] = useState(() => {
-    const rawVal = org ? localStorage.getItem(`tanzil_share_price_${org.id}`) || '১০০' : '১০০';
+    const rawVal = org ? localStorage.getItem(`tanzil_share_price_${org.id}`) || '১০' : '১০';
     return convertBanglaToEnglishNumber(rawVal);
   });
 
@@ -95,13 +98,17 @@ export const MemberAdmissionForm: React.FC<MemberAdmissionFormProps> = ({
     }
   }, [workingDay]);
 
-  // Sync admission and passbook fees automatically when org changes
+  // Sync admission and passbook fees as well as share config automatically when org changes
   useEffect(() => {
     if (org) {
       const rawAd = localStorage.getItem(`tanzil_sav_admission_fee_${org.id}`) || '১০০';
       setAdmissionFee(convertBanglaToEnglishNumber(rawAd));
       const rawPass = localStorage.getItem(`tanzil_sav_passbook_fee_${org.id}`) || '১০';
       setPassbookFee(convertBanglaToEnglishNumber(rawPass));
+      const rawSharePrice = localStorage.getItem(`tanzil_share_price_${org.id}`) || '১০';
+      setSharePrice(convertBanglaToEnglishNumber(rawSharePrice));
+      const rawMinShares = localStorage.getItem(`tanzil_min_shares_${org.id}`) || '১';
+      setShareCount(convertBanglaToEnglishNumber(rawMinShares) || '1');
     }
   }, [org]);
 

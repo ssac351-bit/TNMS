@@ -51,7 +51,7 @@ export const ShareManagementView: React.FC<ShareManagementViewProps> = ({
   // --- Cooperative Share Config State ---
   const [sharePrice, setSharePrice] = useState<number>(() => {
     const saved = localStorage.getItem(`tanzil_share_price_${org.id}`);
-    return saved ? Number(convertBanglaToEnglishNumber(saved)) || 100 : 100;
+    return saved ? Number(convertBanglaToEnglishNumber(saved)) || 10 : 10;
   });
 
   const [minShareCount, setMinShareCount] = useState<number>(() => {
@@ -878,12 +878,12 @@ export const ShareManagementView: React.FC<ShareManagementViewProps> = ({
                   <input
                     type="number"
                     value={sharePrice}
-                    onChange={(e) => setSharePrice(Number(e.target.value) || 100)}
+                    onChange={(e) => setSharePrice(Number(e.target.value) || 0)}
                     className="w-full pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold font-mono outline-none focus:border-emerald-600"
                     required
                   />
                 </div>
-                <span className="text-[10px] text-slate-400 font-medium">ডিফল্ট হিসেবে ১০০ টাকা প্রযোজ্য।</span>
+                <span className="text-[10px] text-slate-400 font-medium">যেমন: ১০ টাকা বা ১০০ টাকা (সংস্থার পলিসি অনুযায়ী)।</span>
               </div>
 
               <div>

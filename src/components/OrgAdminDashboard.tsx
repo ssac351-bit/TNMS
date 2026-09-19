@@ -37,7 +37,8 @@ import {
   ChevronLeft,
   ChevronRight,
   RotateCcw,
-  Upload
+  Upload,
+  CheckCircle
 } from 'lucide-react';
 import { Organization, Staff, Branch, Holiday, Group, LoanProductConfig } from '../types';
 import SyncStatusHub from './SyncStatusHub';
@@ -544,6 +545,9 @@ export default function OrgAdminDashboard({ org, onLogout, onUpdateOrg }: OrgAdm
   const [savingsAdmissionFee, setSavingsAdmissionFee] = useState(() => localStorage.getItem(`tanzil_sav_admission_fee_${org.id}`) || '১০০');
   const [savingsPassbookFee, setSavingsPassbookFee] = useState(() => localStorage.getItem(`tanzil_sav_passbook_fee_${org.id}`) || '১০');
   const [savingsWelfareFee, setSavingsWelfareFee] = useState(() => localStorage.getItem(`tanzil_sav_welfare_fee_${org.id}`) || '২০');
+  // Cooperative Share Capital settings
+  const [sharePriceConfig, setSharePriceConfig] = useState(() => localStorage.getItem(`tanzil_share_price_${org.id}`) || '১০');
+  const [minShareCountConfig, setMinShareCountConfig] = useState(() => localStorage.getItem(`tanzil_min_shares_${org.id}`) || '১');
 
   // Loan Insurance fields (বিতরণকৃত আসলের % এবং যৌথ/একক বীমা)
   const [loanInsurancePercent, setLoanInsurancePercent] = useState(() => localStorage.getItem(`tanzil_loan_ins_percent_${org.id}`) || '১');
@@ -972,6 +976,8 @@ export default function OrgAdminDashboard({ org, onLogout, onUpdateOrg }: OrgAdm
     localStorage.setItem(`tanzil_sav_admission_fee_${org.id}`, savingsAdmissionFee);
     localStorage.setItem(`tanzil_sav_passbook_fee_${org.id}`, savingsPassbookFee);
     localStorage.setItem(`tanzil_sav_welfare_fee_${org.id}`, savingsWelfareFee);
+    localStorage.setItem(`tanzil_share_price_${org.id}`, sharePriceConfig);
+    localStorage.setItem(`tanzil_min_shares_${org.id}`, minShareCountConfig);
 
     // Loan Insurance settings
     localStorage.setItem(`tanzil_loan_ins_percent_${org.id}`, loanInsurancePercent);
@@ -2370,6 +2376,59 @@ export default function OrgAdminDashboard({ org, onLogout, onUpdateOrg }: OrgAdm
                               onChange={(e) => setSavingsWelfareFee(e.target.value)}
                               required
                             />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Cooperative Share Capital Configuration */}
+                      <div className="bg-emerald-50/60 p-3.5 rounded-xl border border-emerald-200/80 space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <h5 className="text-[11px] font-extrabold text-emerald-900 flex items-center gap-1.5">
+                            <CheckCircle size={13} className="text-emerald-600" />
+                            সমবায় শেয়ার মূলধন কনফিগারেশন (Cooperative Share Settings)
+                          </h5>
+                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-full border border-emerald-200">
+                            সদস্য ভর্তিতে প্রযোজ্য
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[10px] sm:text-xs font-bold text-slate-700 mb-1">
+                              প্রতি শেয়ারের মূল্য (Share Face Value) *
+                            </label>
+                            <div className="relative">
+                              <span className="absolute left-3 top-1.5 text-xs text-slate-400 font-bold font-mono">৳</span>
+                              <input 
+                                type="text"
+                                className="w-full pl-7 pr-3 py-1.5 border border-emerald-300 rounded-lg text-xs font-bold focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-white"
+                                value={sharePriceConfig}
+                                onChange={(e) => setSharePriceConfig(e.target.value)}
+                                placeholder="১০"
+                                required
+                              />
+                            </div>
+                            <span className="text-[10px] text-slate-500 mt-1 block">
+                              যেমন: ১০ টাকা বা ১০০ টাকা (ভর্তি ফর্মে অটোমেটিক এই দর বসবে)
+                            </span>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] sm:text-xs font-bold text-slate-700 mb-1">
+                              ভর্তির সময় সর্বনিম্ন শেয়ার সংখ্যা *
+                            </label>
+                            <div className="relative">
+                              <input 
+                                type="text"
+                                className="w-full px-3 py-1.5 border border-emerald-300 rounded-lg text-xs font-bold focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-white"
+                                value={minShareCountConfig}
+                                onChange={(e) => setMinShareCountConfig(e.target.value)}
+                                placeholder="১"
+                                required
+                              />
+                            </div>
+                            <span className="text-[10px] text-slate-500 mt-1 block">
+                              সদস্য ভর্তিতে ন্যূনতম ১ টি শেয়ার ক্রয় বাধ্যতামূলক
+                            </span>
                           </div>
                         </div>
                       </div>
