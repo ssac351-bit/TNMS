@@ -1,17 +1,31 @@
 import React, { useEffect, useState } from 'react';
-import { Download } from 'lucide-react';
+import { Download, X } from 'lucide-react';
+import { isPwaInstalledOrAppMode, markPwaAsInstalled, subscribeToPwaInstallChanges } from '../lib/pwaUtils';
+import { PwaInstallModal } from './PwaInstallModal';
 
 export const PwaFloatingButton: React.FC = () => {
   const [deferredPrompt, setDeferredPrompt] = useState<any>((window as any).deferredInstallPrompt || null);
-  const [isStandalone, setIsStandalone] = useState(false);
-  const [showToast, setShowToast] = useState(false);
+  const [isInstalledOrApp, setIsInstalledOrApp] = useState(() => isPwaInstalledOrAppMode());
+  const [isDismissed, setIsDismissed] = useState(() => {
+    try {
+      return sessionStorage.getItem('pwa_prompt_dismissed') === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+  const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
-    // Check if app is already running in standalone / installed mode
-    if (window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true) {
-      setIsStandalone(true);
+    // If already detected as installed / standalone, do nothing
+    if (isPwaInstalledOrAppMode()) {
+      setIsInstalledOrApp(true);
       return;
     }
+
+    // Subscribe to install changes (appinstalled event, media query transitions)
+    const unsubscribe = subscribeToPwaInstallChanges(() => {
+      setIsInstalledOrApp(true);
+    });
 
     // Check if early event was already captured
     if ((window as any).deferredInstallPrompt) {
@@ -34,6 +48,7 @@ export const PwaFloatingButton: React.FC = () => {
     window.addEventListener('pwa_prompt_ready', readyHandler);
 
     return () => {
+      unsubscribe();
       window.removeEventListener('beforeinstallprompt', handler);
       window.removeEventListener('pwa_prompt_ready', readyHandler);
     };
@@ -54,46 +69,67 @@ export const PwaFloatingButton: React.FC = () => {
         await promptEvent.prompt();
         const { outcome } = await promptEvent.userChoice;
         if (outcome === 'accepted') {
+          // Immediately mark as installed so button never shows again
+          markPwaAsInstalled();
+          setIsInstalledOrApp(true);
           setDeferredPrompt(null);
           (window as any).deferredInstallPrompt = null;
+          return;
         }
       } catch (err) {
         console.warn('Install prompt error:', err);
       }
     } else {
-      // Show brief floating toast if browser is still initializing WebAPK
-      setShowToast(true);
-      setTimeout(() => setShowToast(false), 4000);
+      // If native prompt is not directly available, show the installation modal
+      setShowModal(true);
     }
   };
 
-  // Do not show button if already installed and running standalone
-  if (isStandalone) return null;
+  const handleDismiss = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsDismissed(true);
+    try {
+      sessionStorage.setItem('pwa_prompt_dismissed', 'true');
+    } catch (err) {}
+  };
+
+  // Crucial: When already installed or running as an app, do NOT render the install button
+  if (isInstalledOrApp || isDismissed) {
+    return null;
+  }
 
   return (
     <>
-      <button
-        type="button"
-        id="pwa-floating-install-btn"
-        onClick={handleClick}
-        className="fixed bottom-4 right-4 z-40 bg-[#0a4635] hover:bg-[#125844] text-white py-2.5 px-4 rounded-full shadow-2xl border-2 border-emerald-400 flex items-center gap-2 transition-all active:scale-95 cursor-pointer text-xs font-black group animate-bounce"
-        title="সরাসরি অ্যাপ ইনস্টল করুন"
-      >
-        <div className="w-6 h-6 rounded-full bg-emerald-400 text-[#0a4635] flex items-center justify-center font-bold">
-          <Download size={14} className="stroke-[3]" />
-        </div>
-        <span className="hidden sm:inline">সরাসরি অ্যাপ ইনস্টল করুন</span>
-        <span className="sm:hidden">অ্যাপ ইনস্টল</span>
-      </button>
+      <div className="fixed bottom-4 right-4 z-40 flex items-center group">
+        <button
+          type="button"
+          id="pwa-floating-install-btn"
+          onClick={handleClick}
+          className="bg-[#0a4635] hover:bg-[#125844] text-white py-2.5 pl-3.5 pr-2 rounded-full shadow-2xl border-2 border-emerald-400 flex items-center gap-2 transition-all active:scale-95 cursor-pointer text-xs font-black animate-bounce hover:animate-none"
+          title="সরাসরি অ্যাপ ইনস্টল করুন"
+        >
+          <div className="w-6 h-6 rounded-full bg-emerald-400 text-[#0a4635] flex items-center justify-center font-bold shrink-0">
+            <Download size={14} className="stroke-[3]" />
+          </div>
+          <span className="hidden sm:inline">সরাসরি অ্যাপ ইনস্টল করুন</span>
+          <span className="sm:hidden">অ্যাপ ইনস্টল</span>
+          
+          <span
+            onClick={handleDismiss}
+            className="w-5 h-5 rounded-full hover:bg-emerald-800 text-emerald-200 hover:text-white flex items-center justify-center ml-1 cursor-pointer transition-colors"
+            title="লুকিয়ে রাখুন"
+          >
+            <X size={12} />
+          </span>
+        </button>
+      </div>
 
-      {showToast && (
-        <div className="fixed bottom-16 right-4 z-50 bg-slate-900/95 text-white text-xs px-4 py-3 rounded-2xl shadow-2xl border border-slate-700 animate-in fade-in slide-in-from-bottom-2 duration-200 max-w-xs">
-          <p className="font-bold text-emerald-400 mb-0.5">অ্যান্ড্রয়েড ইনস্টল ডায়ালগ</p>
-          <p className="text-slate-300 text-[11px]">
-            ব্রাউজার মেনুর <strong>৩টি ডট (⋮)</strong> থেকে <strong>"Install app"</strong> চাপলেও সরাসরি ফোনে লোগোসহ ইনস্টল হবে।
-          </p>
-        </div>
-      )}
+      <PwaInstallModal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        onNativeInstall={handleClick}
+        hasNativePrompt={!!(window as any).deferredInstallPrompt || !!deferredPrompt}
+      />
     </>
   );
 };

@@ -82,13 +82,12 @@ import { RealizedInformationView } from './RealizedInformationView';
 import { TransactionSummaryView } from './TransactionSummaryView';
 import { getDefaultHolidays } from '../utils/holidayHelper';
 import SyncStatusHub from './SyncStatusHub';
-import { PwaInstallBanner } from './PwaInstallBanner';
 import { MasterRollView } from './MasterRollView';
 import { CashReceiptPaymentView } from './CashReceiptPaymentView';
 import { registerDeletedId } from '../lib/deletedIds';
 import { TanzilLogo } from './TanzilLogo';
 import { OrgLogo } from './OrgLogo';
-import { formatDDMMYYYY, downloadExcelCsv } from '../lib/dateUtils';
+import { formatDDMMYYYY, downloadExcelCsv, exportReportToExcel } from '../lib/dateUtils';
 
 interface BranchManagerDashboardProps {
   org: Organization;
@@ -6631,36 +6630,47 @@ export default function BranchManagerDashboard({ org, staff, onLogout, isSimulat
                           ];
                           
                           // Chronological order (oldest first for excel spreadsheets)
-                          const rows = [...filteredDates].reverse().map(d => getColumnarRowForDate(d));
-                          const csvRows = [
-                            headers.join(','),
-                            ...rows.map(r => [
-                              `"${formatDDMMYYYY(r.date)}"`,
-                              r.opening,
-                              r.installment_sc,
-                              r.gs,
-                              r.lts,
-                              r.cbs,
-                              r.lsrf_collection,
-                              r.bankWithdrawal,
-                              r.otherReceipts,
-                              r.totalReceipts,
-                              r.loanDisburse,
-                              r.gsWithdrawal,
-                              r.gsRefund,
-                              r.ltsWithdrawal,
-                              r.ltsRefund,
-                              r.cbsWithdrawal,
-                              r.cbsRefund,
-                              r.lsrfRefund,
-                              r.bankDeposit,
-                              r.officeExpenses,
-                              r.totalPayments,
-                              r.closing
-                            ].join(','))
-                          ].join('\r\n');
-                          
-                          downloadExcelCsv(csvRows, `Tanzil_Cash_Book_Register_${workingDay || 'Export'}`);
+                          const rawRows = [...filteredDates].reverse().map(d => getColumnarRowForDate(d));
+                          const rows = rawRows.map(r => [
+                            formatDDMMYYYY(r.date),
+                            r.opening,
+                            r.installment_sc,
+                            r.gs,
+                            r.lts,
+                            r.cbs,
+                            r.lsrf_collection,
+                            r.bankWithdrawal,
+                            r.otherReceipts,
+                            r.totalReceipts,
+                            r.loanDisburse,
+                            r.gsWithdrawal,
+                            r.gsRefund,
+                            r.ltsWithdrawal,
+                            r.ltsRefund,
+                            r.cbsWithdrawal,
+                            r.cbsRefund,
+                            r.lsrfRefund,
+                            r.bankDeposit,
+                            r.officeExpenses,
+                            r.totalPayments,
+                            r.closing
+                          ]);
+
+                          const branchName = currentBranch?.name || 'প্রধান শাখা';
+                          const preparedBy = `${staff.name} (${staff.designation || 'শাখা ব্যবস্থাপক'})`;
+                          const dateRangeStr = filteredDates.length > 1
+                            ? `${formatDDMMYYYY(filteredDates[filteredDates.length - 1])} হতে ${formatDDMMYYYY(filteredDates[0])}`
+                            : `তারিখ: ${formatDDMMYYYY(workingDay)}`;
+
+                          exportReportToExcel({
+                            orgName: org.name,
+                            branchName,
+                            reportTitle: 'ডেইলি কলামনার ক্যাশ বুক রেজিস্টার ও সমন্বিত নগদান হিসাব',
+                            dateRangeText: dateRangeStr,
+                            preparedBy,
+                            headers,
+                            rows
+                          });
                         };
 
                         return (

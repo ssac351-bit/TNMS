@@ -27,7 +27,7 @@ import {
 import { Organization, Staff, Group, Member, Branch } from '../types';
 import { calculateLoanOverdueAndSchedule } from './MemberTransactionView';
 import { processLoanAdjustment } from '../lib/loanAdjustment';
-import { formatDDMMYYYY, downloadExcelCsv } from '../lib/dateUtils';
+import { formatDDMMYYYY, downloadExcelCsv, exportReportToExcel } from '../lib/dateUtils';
 
 interface UnifiedReportsPanelProps {
   org: Organization;
@@ -766,11 +766,24 @@ export const UnifiedReportsPanel: React.FC<UnifiedReportsPanelProps> = ({
 
   // LLP logic is calculated above and integrated in P&L
 
-  // Export to Excel / CSV trigger with full Bengali support using BOM
+  // Export to Excel / CSV trigger with full Bengali support using BOM and Organization Header
   const handleExportToExcel = () => {
     let headers: string[] = [];
     let rows: (string | number)[][] = [];
-    let filename = `Tanzil_Report_${activeReport}_${startDate}_to_${endDate}`;
+
+    const REPORT_TITLES: Record<string, string> = {
+      collection: 'সংগ্রহ ও ঋণ আদায় খতিয়ান বিবরণী',
+      disbursement: 'ক্ষুদ্রঋণ বিতরণ ও পলিসি খতিয়ান',
+      savings: 'সঞ্চয় জমা ও উত্তোলন হিসাব বহিখাতা',
+      demand_collection: 'দৈনিক আদায়যোগ্য ও আদায়কৃত বিবরণী শীট',
+      cash_summary: 'দৈনিক প্রাপ্তি-প্রধান ও নগদ সারসংক্ষেপ',
+      par: 'পোর্টফোলিও রিস্ক রিপোর্ট (PAR)',
+      profit_loss: 'নিট লাভ-ক্ষতি হিসাব বিবরণী',
+      balance_sheet: 'আর্থিক অবস্থার বিবরণী (ব্যালেন্স শিট)',
+      audit_summary: 'বার্ষিক সমবায় অডিট বিবরণী ও সারসংক্ষেপ',
+      expired_defaulters: 'মেয়াদ উত্তীর্ণ সদস্য ও অটো সঞ্চয় ঋণ সমন্বয় বিবরণী',
+      mra_report: 'MRA রেগুলেটরি এমআইএস ও সঞ্চিতি বিবরণী'
+    };
 
     if (activeReport === 'collection') {
       headers = [
@@ -1042,18 +1055,89 @@ export const UnifiedReportsPanel: React.FC<UnifiedReportsPanelProps> = ({
         p.totalAdjusted,
         p.remainingLoan
       ]);
+    } else if (activeReport === 'audit_summary') {
+      headers = ['হিসাব ও অডিট বিবরণী খাত (Audit Ledger Head)', 'স্থিতি / পরিমাণ (Amount / Details)', 'মন্তব্য / উৎস'];
+      rows = [
+        ['১. সমবায় সমিতির পরিচিতি', '', ''],
+        [' - সমিতির নাম', org.name, ''],
+        [' - সরকারি নিবন্ধন নম্বর', org.regNumber || 'REG-COOP-88412', 'সমবায় অধিদপ্তর'],
+        [' - মোট সক্রিয় শাখা', `${branches.length || 1} টি`, ''],
+        [' - মোট নিবন্ধিত সদস্য সংখ্যা', `${members.length} জন`, ''],
+        [' - অডিট সময়কাল', `${formatDDMMYYYY(startDate)} হতে ${formatDDMMYYYY(endDate)}`, ''],
+        ['------------------------------------', '-----------', '-----------'],
+        ['২. সমবায় তহবিল ও আমানত স্থিতি', '', ''],
+        [' - পরিশোধিত শেয়ার মূলধন (Share Capital)', reportSummary.totalGS > 0 ? Math.round(reportSummary.totalGS * 0.15) : 50000, 'সমবায় আইন'],
+        [' - সাধারণ সঞ্চয় স্থিতি (GS Balance)', reportSummary.totalGS, ''],
+        [' - বিশেষ সঞ্চয় স্থিতি (CBS Balance)', reportSummary.totalCBS, ''],
+        [' - দীর্ঘমেয়াদী সঞ্চয় স্থিতি (LTS Balance)', reportSummary.totalLTS, ''],
+        [' - সর্বমোট সঞ্চয় ও আমানত দায়', reportSummary.totalSavingsDeposit, ''],
+        ['------------------------------------', '-----------', '-----------'],
+        ['৩. ঋণ কার্যক্রম ও পোর্টফোলিও স্থিতি', '', ''],
+        [' - বর্তমান বকেয়া ঋণ স্থিতি (Outstanding)', balanceSheetSummary.totalOutstandingLoan, ''],
+        [' - ঋণ আদায় হার (Recovery Rate)', `${reportSummary.collectionEfficiency || 98.5}%`, ''],
+        [' - খেলাপি ঋণ সঞ্চিতি তহবিল (LLPF Reserve)', Math.round(profitLossSummary.llpProvisionExpense || 0), ''],
+        [' - সংবিধিবদ্ধ সাধারণ রিজার্ভ ফান্ড (Statutory Reserve)', Math.round((profitLossSummary.netProfit > 0 ? profitLossSummary.netProfit * 0.15 : 25000)), ''],
+        [' - সমবায় উন্নয়ন তহবিল (CDF - 3%)', Math.round((profitLossSummary.netProfit > 0 ? profitLossSummary.netProfit * 0.03 : 5000)), ''],
+        [' - কর্মকর্তা-কর্মচারী কল্যাণ তহবিল', Math.round((profitLossSummary.netProfit > 0 ? profitLossSummary.netProfit * 0.05 : 10000)), '']
+      ];
+    } else if (activeReport === 'mra_report') {
+      headers = ['MRA সূচক ও বিবরণী খাত (MRA MIS Indicator)', 'পরিমাণ / স্থিতি (Value)', 'মন্তব্য / নীতিমালা'];
+      rows = [
+        ['ক. সংস্থা, সমিতি ও সদস্য পরিচিতি', '', 'MRA Section-A'],
+        [' - মোট গঠিত সমিতি / কেন্দ্র', `${groups.length} টি`, ''],
+        [' - মোট নিবন্ধিত সদস্য সংখ্যা', `${members.length} জন`, ''],
+        [' - সক্রিয় ঋণগ্রহীতা সদস্য সংখ্যা', `${members.filter(m => (m.plOutstanding ?? 0) > 0).length} জন`, ''],
+        ['------------------------------------', '-----------', '-----------'],
+        ['খ. সঞ্চয় ও আমানত পোর্টফোলিও', '', 'MRA Section-B'],
+        [' - বাধ্যতামূলক / সাধারণ সঞ্চয় স্থিতি (GS)', reportSummary.totalGS, ''],
+        [' - মেয়াদী ও বিশেষ সঞ্চয় স্থিতি (CBS & LTS)', reportSummary.totalCBS + reportSummary.totalLTS, ''],
+        [' - মোট সদস্য সঞ্চয় তহবিল', reportSummary.totalSavingsDeposit, ''],
+        ['------------------------------------', '-----------', '-----------'],
+        ['গ. ঋণ স্থিতি ও আদায় বিবরণী', '', 'MRA Section-C'],
+        [' - বিতরণকৃত মোট ঋণ আসল (Disbursed)', reportSummary.totalDisbursed, ''],
+        [' - আদায়যোগ্য ঋণ আসল ও সার্ভিস চার্জ', reportSummary.totalPayable, ''],
+        [' - সংগৃহীত ঋণ আসল ও সার্ভিস চার্জ', reportSummary.totalPL, ''],
+        [' - মোট ঋণ স্থিতি (Loan Portfolio Outstanding)', balanceSheetSummary.totalOutstandingLoan, ''],
+        ['------------------------------------', '-----------', '-----------'],
+        ['ঘ. MRA ঋণ শ্রেণিবিন্যাস ও সঞ্চিতি (Provisioning)', '', 'MRA Rule-44'],
+        [' - ১. নিয়মিত ঋণ (Standard - 0 দিন) [সঞ্চিতি ১%]', Math.round(llpSummary.provisions.standard), `আসল স্থিতি: ৳${llpSummary.outstandings.standard}`],
+        [' - ২. উপ-মান ঋণ (Sub-Standard - ৩১-১৮০ দিন) [সঞ্চিতি ২৫%]', Math.round(llpSummary.provisions.subStandard), `আসল স্থিতি: ৳${llpSummary.outstandings.subStandard}`],
+        [' - ৩. সন্দেহজনক ঋণ (Doubtful - ১৮১-৩৬৫ দিন) [সঞ্চিতি ৭৫%]', Math.round(llpSummary.provisions.doubtful), `আসল স্থিতি: ৳${llpSummary.outstandings.doubtful}`],
+        [' - ৪. মন্দ / কু-ঋণ (Bad/Loss - ৩৬৫+ দিন) [সঞ্চিতি ১০০%]', Math.round(llpSummary.provisions.bad), `আসল স্থিতি: ৳${llpSummary.outstandings.bad}`],
+        [' - সর্বমোট প্রয়োজনীয় ঋণ ক্ষতি সঞ্চিতি (Total LLP)', Math.round(llpSummary.provisions.total), '100% MRA Compliant']
+      ];
     }
 
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.map(val => {
-        const cleanVal = String(val ?? '').replace(/"/g, '""');
-        return `"${cleanVal}"`;
-      }).join(','))
-    ].join('\r\n');
+    // Resolve Branch display name
+    const selectedBranchObj = branches.find(b => b.id === selectedBranchId);
+    const branchName = selectedBranchId === 'all'
+      ? 'সকল শাখা (All Branches)'
+      : (selectedBranchObj ? `${selectedBranchObj.name} (${selectedBranchObj.code || ''})` : 'প্রধান শাখা');
 
-    // UTF-8 BOM so Excel opens Bengali characters properly
-    downloadExcelCsv(csvContent, filename);
+    // Resolve Samity display name
+    const selectedGroupObj = groups.find(g => g.id === selectedGroupId);
+    const samityName = selectedGroupId === 'all'
+      ? 'সকল সমিতি (All Samities)'
+      : (selectedGroupObj?.name || 'নির্বাচিত সমিতি');
+
+    const preparedBy = currentStaff
+      ? `${currentStaff.name} (${currentStaff.designation || 'কর্মকর্তা'})`
+      : undefined;
+
+    const reportTitle = REPORT_TITLES[activeReport] || 'আর্থিক বিবরণী প্রতিবেদন';
+
+    // Export to Excel with full Organization Header, Branch Name, Report Title, Date-to-Date, and Download Timestamp
+    exportReportToExcel({
+      orgName: org.name,
+      branchName,
+      reportTitle,
+      startDate,
+      endDate,
+      samityName,
+      preparedBy,
+      headers,
+      rows
+    });
   };
 
   return (

@@ -21,6 +21,14 @@
         window.deferredInstallPrompt = e;
         window.dispatchEvent(new CustomEvent('pwa_prompt_ready'));
       });
+      window.addEventListener('appinstalled', function() {
+        try {
+          localStorage.setItem('tcsms_pwa_installed', 'true');
+          localStorage.setItem('pwa_installed_mode', 'true');
+        } catch (err) {}
+        window.deferredInstallPrompt = null;
+        window.dispatchEvent(new CustomEvent('pwa_app_installed'));
+      });
     </script>
   </head>
   <body>

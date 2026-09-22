@@ -7,7 +7,6 @@ import React, { useState } from 'react';
 import { Lock, User, Building, AlertCircle, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { Organization, Staff } from '../types';
 import { auth, signInWithEmailAndPassword } from '../lib/firebase';
-import { PwaInstallBanner } from './PwaInstallBanner';
 import { TanzilLogo } from './TanzilLogo';
 
 interface LoginScreenProps {

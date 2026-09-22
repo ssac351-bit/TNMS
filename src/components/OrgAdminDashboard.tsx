@@ -5104,7 +5104,6 @@ export default function OrgAdminDashboard({ org, onLogout, onUpdateOrg }: OrgAdm
           {activeTab === 'audit-logs' && (
             <AuditLogView org={org} onBack={() => setActiveTab('home')} />
           )}
-[diff_block_end]
 
         </main>
       </div>

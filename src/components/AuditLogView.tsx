@@ -109,7 +109,12 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ org, onBack }) => {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ logs, notifications }, null, 2));
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", `tanzil_audit_trail_${org.id}_${new Date().toISOString().split('T')[0]}.json`);
+    const cleanOrg = (org.name || 'প্রতিষ্ঠান')
+      .replace(/tanzil|software|app/gi, '')
+      .trim()
+      .replace(/[\/\\?%*:|"<>]/g, '_')
+      .replace(/\s+/g, '_') || 'প্রতিষ্ঠান';
+    downloadAnchor.setAttribute("download", `${cleanOrg}_অডিট_লগ_${new Date().toISOString().split('T')[0]}.json`);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();

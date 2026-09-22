@@ -43,23 +43,11 @@ export function formatDDMMYYYY(dateInput?: string | number | Date | null): strin
   }
 }
 
-/**
- * Download CSV/TSV content formatted for Excel with UTF-8 BOM so Bengali text renders perfectly.
- */
-export function downloadExcelCsv(csvContent: string, filename: string): void {
-  try {
-    // Add UTF-8 BOM (\ufeff) so Microsoft Excel correctly displays Unicode / Bengali characters
-    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    const cleanFilename = (filename || 'export').replace(/[^a-zA-Z0-9_\-\u0980-\u09FF]/g, '_');
-    link.setAttribute('download', `${cleanFilename}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  } catch (err) {
-    console.error('Failed to download excel csv', err);
-  }
-}
+export {
+  downloadExcelCsv,
+  exportReportToExcel,
+  generateExcelFilename,
+  escapeCsvCell,
+  getCurrentExportDateTime
+} from './excelExport';
+export type { ReportExcelHeaderOptions } from './excelExport';

@@ -1,19 +1,24 @@
 import React, { useEffect, useState } from 'react';
 import { Smartphone, X, Download, HelpCircle, Sparkles } from 'lucide-react';
 import { PwaInstallModal } from './PwaInstallModal';
+import { isPwaInstalledOrAppMode, markPwaAsInstalled, subscribeToPwaInstallChanges } from '../lib/pwaUtils';
 
 export const PwaInstallBanner: React.FC = () => {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isOpen, setIsOpen] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [isStandalone, setIsStandalone] = useState(false);
+  const [isInstalledOrApp, setIsInstalledOrApp] = useState(() => isPwaInstalledOrAppMode());
 
   useEffect(() => {
-    // Check if app is already running in standalone PWA mode
-    if (window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true) {
-      setIsStandalone(true);
+    // Check if app is already running in standalone PWA mode or already installed
+    if (isPwaInstalledOrAppMode()) {
+      setIsInstalledOrApp(true);
       return;
     }
+
+    const unsubscribe = subscribeToPwaInstallChanges(() => {
+      setIsInstalledOrApp(true);
+    });
 
     const handler = (e: any) => {
       e.preventDefault();
@@ -21,7 +26,10 @@ export const PwaInstallBanner: React.FC = () => {
       setIsOpen(true);
     };
     window.addEventListener('beforeinstallprompt', handler);
-    return () => window.removeEventListener('beforeinstallprompt', handler);
+    return () => {
+      unsubscribe();
+      window.removeEventListener('beforeinstallprompt', handler);
+    };
   }, []);
 
   const handleInstall = async () => {
@@ -29,6 +37,8 @@ export const PwaInstallBanner: React.FC = () => {
       deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
       if (outcome === 'accepted') {
+        markPwaAsInstalled();
+        setIsInstalledOrApp(true);
         setDeferredPrompt(null);
         setIsOpen(false);
       }
@@ -37,8 +47,8 @@ export const PwaInstallBanner: React.FC = () => {
     }
   };
 
-  // If already installed and launched inside app, don't show the web install banner
-  if (isStandalone || !isOpen) {
+  // If already installed, launched inside app, or closed, don't show the web install banner
+  if (isInstalledOrApp || !isOpen) {
     return (
       <PwaInstallModal
         isOpen={showModal}
