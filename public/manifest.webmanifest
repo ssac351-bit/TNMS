@@ -2,13 +2,17 @@
   "name": "তানজিল মাইক্রোক্রেডিট সফটওয়্যার (TCSMS)",
   "short_name": "TCSMS",
   "id": "/",
-  "start_url": "/",
+  "start_url": "/?mode=standalone",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#0a4635",
   "theme_color": "#0a4635",
   "description": "তানজিল মাইক্রোক্রেডিট ও সমবায় সমিতি ব্যবস্থাপনা সফটওয়্যার",
+  "categories": ["finance", "business", "productivity"],
+  "lang": "bn-BD",
+  "dir": "ltr",
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/pwa-192x192.png",

@@ -26,6 +26,9 @@ export default defineConfig(() => {
           orientation: 'portrait-primary',
           start_url: '/?mode=standalone',
           scope: '/',
+          categories: ['finance', 'business', 'productivity'],
+          lang: 'bn-BD',
+          dir: 'ltr',
           icons: [
             {
               src: '/pwa-192x192.png',
