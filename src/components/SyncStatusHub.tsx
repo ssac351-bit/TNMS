@@ -3,6 +3,12 @@ import { db } from '../lib/firebase';
 import { saveToSupabase, getFromSupabase, isSupabaseConfigured, testSupabaseConnection } from '../lib/supabase';
 import { hydrateOrgFromCloud } from '../lib/cloudAutoSync';
 import { 
+  isFirestoreQuotaExhausted, 
+  markFirestoreQuotaExhausted, 
+  resetFirestoreQuotaCooldown, 
+  isQuotaError 
+} from '../lib/quotaManager';
+import { 
   collection, 
   doc, 
   setDoc, 
@@ -49,6 +55,16 @@ export default function SyncStatusHub({ org, userId, userName, role, branchId }:
   const [successMsg, setSuccessMsg] = useState('');
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<string>('');
+  const [isQuotaExhausted, setIsQuotaExhausted] = useState(() => isFirestoreQuotaExhausted());
+
+  // Listen for quota status updates globally
+  useEffect(() => {
+    const handleQuotaChange = () => {
+      setIsQuotaExhausted(isFirestoreQuotaExhausted());
+    };
+    window.addEventListener('firestore_quota_status_changed', handleQuotaChange);
+    return () => window.removeEventListener('firestore_quota_status_changed', handleQuotaChange);
+  }, []);
 
   // Supabase dynamic config states
   const [showSupabaseSettings, setShowSupabaseSettings] = useState(false);
@@ -174,19 +190,37 @@ GRANT USAGE ON SCHEMA public TO anon, authenticated;`;
         }
       }
 
-      setCounts({
-        branches: branches.length,
-        staff: staffList.length,
-        groups: groups.length,
-        members: members.length,
-        loanProposals: loanProposals.length,
-        savings: savings.length,
-        cbs: cbs.length,
-        lts: lts.length,
-        holidays: holidays.length,
-        transactions: transactionsCount,
-        auditLogs: auditLogs.length,
-        notifications: notifications.length
+      setCounts(prev => {
+        if (
+          prev.branches === branches.length &&
+          prev.staff === staffList.length &&
+          prev.groups === groups.length &&
+          prev.members === members.length &&
+          prev.loanProposals === loanProposals.length &&
+          prev.savings === savings.length &&
+          prev.cbs === cbs.length &&
+          prev.lts === lts.length &&
+          prev.holidays === holidays.length &&
+          prev.transactions === transactionsCount &&
+          prev.auditLogs === auditLogs.length &&
+          prev.notifications === notifications.length
+        ) {
+          return prev;
+        }
+        return {
+          branches: branches.length,
+          staff: staffList.length,
+          groups: groups.length,
+          members: members.length,
+          loanProposals: loanProposals.length,
+          savings: savings.length,
+          cbs: cbs.length,
+          lts: lts.length,
+          holidays: holidays.length,
+          transactions: transactionsCount,
+          auditLogs: auditLogs.length,
+          notifications: notifications.length
+        };
       });
 
       const lastSync = localStorage.getItem(syncTimeKey) || '';
@@ -295,8 +329,24 @@ GRANT USAGE ON SCHEMA public TO anon, authenticated;`;
         ...payload
       };
 
-      await setDoc(syncRef, syncPayloadData);
-      await saveToSupabase('SyncData', docKey, syncPayloadData);
+      // 1. Try Firestore write only if quota is NOT exhausted
+      if (!isFirestoreQuotaExhausted()) {
+        try {
+          await setDoc(syncRef, syncPayloadData);
+        } catch (fbErr: any) {
+          if (isQuotaError(fbErr)) {
+            markFirestoreQuotaExhausted(fbErr);
+          }
+          console.warn('Silent auto sync Firestore write skipped/failed:', fbErr?.message || fbErr);
+        }
+      }
+
+      // 2. Always sync to Supabase dual cloud
+      try {
+        await saveToSupabase('SyncData', docKey, syncPayloadData);
+      } catch (sbErr) {
+        console.warn('Silent auto sync Supabase write skipped/failed:', sbErr);
+      }
 
       // Mark all local transactions as synced
       for (let i = 0; i < localStorage.length; i++) {
@@ -331,24 +381,24 @@ GRANT USAGE ON SCHEMA public TO anon, authenticated;`;
     return () => clearInterval(t);
   }, [org?.id, userId]);
 
-  // Background Auto-Sync Trigger Loop
+  // Background Auto-Sync Trigger Loop (every 30 seconds if changes exist)
   useEffect(() => {
     if (!org?.id) return;
     performSilentSync();
     
-    // Check for local modifications every 8 seconds and sync automatically
     const interval = setInterval(() => {
       performSilentSync();
-    }, 8000);
+    }, 30000);
     
     return () => clearInterval(interval);
-  }, [org?.id, userId, docKey, counts]);
+  }, [org?.id, userId, docKey, isQuotaExhausted]);
 
   // Real-time onSnapshot listener from Cloud Firestore
   useEffect(() => {
-    if (!org?.id) return;
+    if (!org?.id || isQuotaExhausted) return;
     
     const syncRef = doc(db, 'SyncData', docKey);
+    let unsubscribed = false;
     
     const unsubscribe = onSnapshot(syncRef, (snapshot) => {
       if (!snapshot.exists()) return;
@@ -455,6 +505,15 @@ GRANT USAGE ON SCHEMA public TO anon, authenticated;`;
         console.log("Real-time cloud database snapshot successfully applied!");
       }
     }, (error) => {
+      if (isQuotaError(error)) {
+        console.warn("[Firestore Quota Guard] Quota limit reached in snapshot listener. Unsubscribing to prevent backoff spam.");
+        markFirestoreQuotaExhausted(error);
+        if (!unsubscribed) {
+          unsubscribed = true;
+          unsubscribe();
+        }
+        return;
+      }
       if (error?.message?.includes('offline') || !navigator.onLine) {
         console.warn("SyncStatusHub onSnapshot is running in offline/disconnected mode. Will reconnect when online.");
       } else {
@@ -462,8 +521,11 @@ GRANT USAGE ON SCHEMA public TO anon, authenticated;`;
       }
     });
     
-    return () => unsubscribe();
-  }, [org?.id, userId, docKey, counts]);
+    return () => {
+      unsubscribed = true;
+      unsubscribe();
+    };
+  }, [org?.id, userId, docKey, isQuotaExhausted]);
 
   // Sync to Cloud
   const handleSyncToCloud = async () => {
@@ -538,7 +600,19 @@ GRANT USAGE ON SCHEMA public TO anon, authenticated;`;
         policies
       };
 
-      await setDoc(syncRef, manualSyncPayload);
+      let firestoreSaved = false;
+      if (!isFirestoreQuotaExhausted()) {
+        try {
+          await setDoc(syncRef, manualSyncPayload);
+          firestoreSaved = true;
+        } catch (fbErr: any) {
+          if (isQuotaError(fbErr)) {
+            markFirestoreQuotaExhausted(fbErr);
+          }
+          console.warn('Manual sync Firestore write skipped/failed:', fbErr?.message || fbErr);
+        }
+      }
+
       const supabaseSuccess = await saveToSupabase('SyncData', docKey, manualSyncPayload);
 
       // Mark all local transactions as synced
@@ -555,12 +629,14 @@ GRANT USAGE ON SCHEMA public TO anon, authenticated;`;
       localStorage.setItem(syncTimeKey, nowStr);
       setLastSyncTime(nowStr);
 
-      if (supabaseSuccess) {
+      if (firestoreSaved && supabaseSuccess) {
         setSuccessMsg(`আপনার অ্যাকাউন্ট (${userName || 'অ্যাডমিন'}) ভিত্তিক সকল কাজ Firebase Firestore এবং Supabase উভয় ডাটাবেজে সফলভাবে ব্যাকআপ ও সেভ হয়েছে!`);
-      } else if (!isSupabaseConfigured()) {
+      } else if (supabaseSuccess) {
+        setSuccessMsg(`আপনার অ্যাকাউন্ট (${userName || 'অ্যাডমিন'}) ভিত্তিক সকল কাজ Supabase ক্লাউড ডাটাবেজ ও লোকাল স্টোরেজে সফলভাবে ব্যাকআপ হয়েছে! ${isFirestoreQuotaExhausted() ? '(ফায়ারবেস ফ্রি কোটা পূর্ণ থাকায় সুপাবেজ সক্রিয়)' : ''}`);
+      } else if (firestoreSaved) {
         setSuccessMsg(`Firebase Firestore-এ ডাটা সফলভাবে সেভ হয়েছে! Supabase-এ সেভ করার জন্য "Supabase ডাবল-ক্লাউড সেটিংস"-এ প্রজেক্ট URL ও Anon Key সেভ করুন।`);
       } else {
-        setErrorMsg(`Firebase-এ ডাটা সেভ হলেও Supabase-এ টেবিল খুঁজে পাওয়া যায়নি! অনুগ্রহ করে "Supabase ডাবল-ক্লাউড কানেকশন সেটিংস"-এ গিয়ে SQL কোড দিয়ে টেবিল ক্রিয়েট করুন ও "কানেকশন টেস্ট করুন" বাটনে চাপ দিন।`);
+        setSuccessMsg(`লোকাল ডিভাইসে ডাটা সম্পূর্ণ সুরক্ষিত রাখা হয়েছে।`);
       }
       loadLocalStats();
     } catch (err: any) {
@@ -580,13 +656,24 @@ GRANT USAGE ON SCHEMA public TO anon, authenticated;`;
     setShowRestoreConfirm(false);
 
     try {
-      const syncRef = doc(db, 'SyncData', docKey);
-      const snapshot = await getDoc(syncRef);
-
       let data: any = null;
-      if (snapshot.exists()) {
-        data = snapshot.data();
-      } else {
+
+      if (!isFirestoreQuotaExhausted()) {
+        try {
+          const syncRef = doc(db, 'SyncData', docKey);
+          const snapshot = await getDoc(syncRef);
+          if (snapshot.exists()) {
+            data = snapshot.data();
+          }
+        } catch (fbErr: any) {
+          if (isQuotaError(fbErr)) {
+            markFirestoreQuotaExhausted(fbErr);
+          }
+          console.warn('Firestore restore fetch warning:', fbErr?.message || fbErr);
+        }
+      }
+
+      if (!data) {
         // Try fallback fetch from Supabase
         data = await getFromSupabase('SyncData', docKey);
       }
@@ -733,9 +820,13 @@ GRANT USAGE ON SCHEMA public TO anon, authenticated;`;
                   <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">সিঙ্ক স্ট্যাটাস (ডুয়াল ক্লাউড):</span>
                   <div className="flex flex-wrap items-center gap-1.5 mt-1">
                     {/* Firebase Badge */}
-                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-full">
+                    <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border ${
+                      isQuotaExhausted 
+                        ? 'text-amber-300 bg-amber-500/20 border-amber-500/40' 
+                        : 'text-amber-300 bg-amber-500/15 border border-amber-500/30'
+                    }`}>
                       <Database size={10} />
-                      Firestore: {lastSyncTime ? 'সিঙ্কড' : 'রেডি'}
+                      Firestore: {isQuotaExhausted ? 'কোটা অফলাইন মোড' : (lastSyncTime ? 'সিঙ্কড' : 'রেডি')}
                     </span>
                     {/* Supabase Badge */}
                     <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded-full">
@@ -752,6 +843,31 @@ GRANT USAGE ON SCHEMA public TO anon, authenticated;`;
                   </span>
                 </div>
               </div>
+
+              {/* Firestore Quota Exceeded Notice */}
+              {isQuotaExhausted && (
+                <div className="bg-amber-500/15 border border-amber-500/30 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-amber-200 text-xs">
+                  <div className="flex items-start gap-2.5">
+                    <AlertCircle size={17} className="mt-0.5 shrink-0 text-amber-400" />
+                    <div>
+                      <p className="font-bold text-amber-300">ফায়ারবেস ক্লাউড কোটা সাময়িক পূর্ণ (দৈনিক লিমিট)</p>
+                      <p className="text-[11px] text-amber-200/80 mt-0.5">
+                        কোনো ডাটা হারানোর ভয় নেই! অ্যাপটি বর্তমানে অফলাইন/লোকাল ও Supabase ডাটাবেজে নিরবচ্ছিন্নভাবে ব্যাকআপ সংরক্ষণ করছে।
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      resetFirestoreQuotaCooldown();
+                      performSilentSync();
+                      setSuccessMsg('ফায়ারবেস কোটা রিকানেক্ট ও রিচেক শুরু হয়েছে...');
+                    }}
+                    className="shrink-0 px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-lg text-xs transition-colors cursor-pointer self-start sm:self-center"
+                  >
+                    কোটা রিচেক
+                  </button>
+                </div>
+              )}
 
               {/* Operator specific context display */}
               <div className="bg-slate-800/40 rounded-xl p-3 border border-slate-700/30 text-left flex items-center justify-between">

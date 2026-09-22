@@ -6,6 +6,7 @@
 import { db } from './firebase';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { getFromSupabase, getSupabaseClient } from './supabase';
+import { isFirestoreQuotaExhausted, markFirestoreQuotaExhausted, isQuotaError } from './quotaManager';
 import { Organization } from '../types';
 
 /**
@@ -33,54 +34,64 @@ export async function hydrateOrgFromCloud(orgId: string, userId?: string): Promi
   let source = 'none';
 
   try {
-    // 1. Try fetching directly by exact document keys in Firebase Firestore
-    const candidateDocKeys = [
-      userId ? `${orgId}_user_${userId}` : orgId,
-      orgId
-    ];
+    // 1. Try fetching directly by exact document keys in Firebase Firestore (if quota available)
+    if (!isFirestoreQuotaExhausted()) {
+      const candidateDocKeys = [
+        userId ? `${orgId}_user_${userId}` : orgId,
+        orgId
+      ];
 
-    for (const key of candidateDocKeys) {
-      try {
-        const docRef = doc(db, 'SyncData', key);
-        const snap = await getDoc(docRef);
-        if (snap.exists()) {
-          const d = snap.data();
-          if (d && (d.branches || d.members || d.staff || d.transactions || d.groups || d.savings)) {
-            fetchedData = d;
-            source = 'firebase-direct';
+      for (const key of candidateDocKeys) {
+        try {
+          const docRef = doc(db, 'SyncData', key);
+          const snap = await getDoc(docRef);
+          if (snap.exists()) {
+            const d = snap.data();
+            if (d && (d.branches || d.members || d.staff || d.transactions || d.groups || d.savings)) {
+              fetchedData = d;
+              source = 'firebase-direct';
+              break;
+            }
+          }
+        } catch (e: any) {
+          if (isQuotaError(e)) {
+            markFirestoreQuotaExhausted(e);
             break;
           }
+          console.warn(`[AutoCloudSync] Firebase direct fetch error for key ${key}:`, e);
         }
-      } catch (e) {
-        console.warn(`[AutoCloudSync] Firebase direct fetch error for key ${key}:`, e);
       }
-    }
 
-    // 2. If not found, try Firestore Query where orgId == orgId
-    if (!fetchedData) {
-      try {
-        const syncCol = collection(db, 'SyncData');
-        const q = query(syncCol, where('orgId', '==', orgId));
-        const querySnap = await getDocs(q);
-        if (!querySnap.empty) {
-          // Find the newest document by lastUpdated
-          let newestDoc: any = null;
-          let newestTime = 0;
-          querySnap.docs.forEach(dSnap => {
-            const d = dSnap.data();
-            const time = d.lastUpdated ? new Date(d.lastUpdated).getTime() : 0;
-            if (time >= newestTime) {
-              newestTime = time;
-              newestDoc = d;
+      // 2. If not found, try Firestore Query where orgId == orgId
+      if (!fetchedData && !isFirestoreQuotaExhausted()) {
+        try {
+          const syncCol = collection(db, 'SyncData');
+          const q = query(syncCol, where('orgId', '==', orgId));
+          const querySnap = await getDocs(q);
+          if (!querySnap.empty) {
+            // Find the newest document by lastUpdated
+            let newestDoc: any = null;
+            let newestTime = 0;
+            querySnap.docs.forEach(dSnap => {
+              const d = dSnap.data();
+              const time = d.lastUpdated ? new Date(d.lastUpdated).getTime() : 0;
+              if (time >= newestTime) {
+                newestTime = time;
+                newestDoc = d;
+              }
+            });
+            if (newestDoc) {
+              fetchedData = newestDoc;
+              source = 'firebase-query';
             }
-          });
-          if (newestDoc) {
-            fetchedData = newestDoc;
-            source = 'firebase-query';
+          }
+        } catch (e: any) {
+          if (isQuotaError(e)) {
+            markFirestoreQuotaExhausted(e);
+          } else {
+            console.warn(`[AutoCloudSync] Firebase query fetch error for org ${orgId}:`, e);
           }
         }
-      } catch (e) {
-        console.warn(`[AutoCloudSync] Firebase query fetch error for org ${orgId}:`, e);
       }
     }
 

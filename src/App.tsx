@@ -15,6 +15,7 @@ import { db } from './lib/firebase';
 import { collection, getDocs, doc, setDoc, deleteDoc, getDocFromServer } from 'firebase/firestore';
 import { saveToSupabase, deleteFromSupabase } from './lib/supabase';
 import { hydrateOrgFromCloud, hydrateAllOrgsFromCloud } from './lib/cloudAutoSync';
+import { isFirestoreQuotaExhausted, markFirestoreQuotaExhausted, isQuotaError } from './lib/quotaManager';
 import { PwaFloatingButton } from './components/PwaFloatingButton';
 
 export default function App() {
@@ -62,16 +63,27 @@ export default function App() {
   // Fetch organizations from Firestore and merge with localStorage to prevent data loss
   useEffect(() => {
     async function fetchOrganizations() {
-      console.log("Fetching organizations from Firestore...");
+      console.log("Fetching organizations...");
       try {
-        const fetchPromise = getDocs(collection(db, 'Organizations'));
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Firestore fetch timeout")), 3000)
-        );
+        let orgs: Organization[] = [];
 
-        const querySnapshot = await Promise.race([fetchPromise, timeoutPromise]);
-        const orgs = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Organization));
-        console.log("Fetched organizations:", orgs);
+        if (!isFirestoreQuotaExhausted()) {
+          try {
+            const fetchPromise = getDocs(collection(db, 'Organizations'));
+            const timeoutPromise = new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error("Firestore fetch timeout")), 3000)
+            );
+
+            const querySnapshot = await Promise.race([fetchPromise, timeoutPromise]);
+            orgs = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Organization));
+            console.log("Fetched organizations from Firestore:", orgs);
+          } catch (fbErr: any) {
+            if (isQuotaError(fbErr)) {
+              markFirestoreQuotaExhausted(fbErr);
+            }
+            console.warn("Firestore fetchOrganizations failed/timeout:", fbErr?.message || fbErr);
+          }
+        }
         
         // Merge with existing local storage organizations so the user keeps current NGOs
         const localSaved = localStorage.getItem('tanzil_orgs');
@@ -105,7 +117,7 @@ export default function App() {
         // Automatic background cloud auto-hydration for all organizations on app start
         hydrateAllOrgsFromCloud(finalOrgs);
       } catch (error) {
-        console.warn("Error/Timeout fetching organizations from Firestore (using local fallback): ", error);
+        console.warn("Error fetching organizations (using local fallback): ", error);
         // Fallback to local storage
         const localSaved = localStorage.getItem('tanzil_orgs');
         const parsed: Organization[] = localSaved ? JSON.parse(localSaved) : [];
@@ -154,12 +166,25 @@ export default function App() {
 
     async function syncChanges() {
       try {
+        const canWriteFirestore = !isFirestoreQuotaExhausted();
         for (const org of deleted) {
-          await deleteDoc(doc(db, 'Organizations', org.id));
+          if (canWriteFirestore) {
+            try {
+              await deleteDoc(doc(db, 'Organizations', org.id));
+            } catch (fbErr: any) {
+              if (isQuotaError(fbErr)) markFirestoreQuotaExhausted(fbErr);
+            }
+          }
           await deleteFromSupabase('Organizations', org.id);
         }
         for (const org of savedOrUpd) {
-          await setDoc(doc(db, 'Organizations', org.id), org);
+          if (canWriteFirestore) {
+            try {
+              await setDoc(doc(db, 'Organizations', org.id), org);
+            } catch (fbErr: any) {
+              if (isQuotaError(fbErr)) markFirestoreQuotaExhausted(fbErr);
+            }
+          }
           await saveToSupabase('Organizations', org.id, org);
         }
       } catch (err) {
