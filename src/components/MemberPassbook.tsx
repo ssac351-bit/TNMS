@@ -29,10 +29,33 @@ export const MemberPassbook: React.FC<MemberPassbookProps> = ({ txs }) => {
     } else if (category === 'savings_interest' || title.includes('সঞ্চয় লাভ') || title.includes('Savings Interest') || title.includes('সঞ্চয় লভ্যাংশ')) {
       displayType = 'Savings Interest';
       process = 'Transfer';
+    } else if (category === 'share_dividend' || title.includes('শেয়ার লভ্যাংশ') || title.includes('Share Dividend')) {
+      displayType = 'Share Dividend';
+      process = 'Transfer';
+    } else if (title.includes('শেয়ার প্রত্যাহার') || title.includes('শেয়ার ফেরত') || title.includes('Share Refund')) {
+      displayType = 'Share Refund';
+    } else if (title.includes('শেয়ার') || title.includes('Share')) {
+      if (title.includes('উত্তোলন') || title.includes('Withdrawal') || title.includes('ফেরত')) {
+        displayType = 'Share Refund';
+      } else {
+        displayType = 'Share Deposit';
+      }
+    } else if (title.includes('CBS') || title.includes('cbs')) {
+      if (title.includes('উত্তোলন') || title.includes('Withdrawal') || title.includes('ফেরত')) {
+        displayType = 'CBS Withdraw';
+      } else {
+        displayType = 'CBS Deposit';
+      }
+    } else if (title.includes('LTS') || title.includes('lts')) {
+      if (title.includes('উত্তোলন') || title.includes('Withdrawal') || title.includes('ফেরত')) {
+        displayType = 'LTS Withdraw';
+      } else {
+        displayType = 'LTS Deposit';
+      }
     } else if (title.includes('উত্তোলন') || title.includes('Withdrawal') || title.includes('ফেরত')) {
       displayType = 'Savings Withdraw';
     } else if (title.includes('আদায়') || title.includes('repayment')) {
-      displayType = 'Savings Deposit';
+      displayType = title.includes('ঋণ') ? 'Installment Paid' : 'Savings Deposit';
     } else if (title.includes('প্রারম্ভিক') || title.includes('Opening')) {
       displayType = 'Opening Balance';
     } else if (title.includes('ঋণ বিতরণ') || title.includes('Disbursed')) {

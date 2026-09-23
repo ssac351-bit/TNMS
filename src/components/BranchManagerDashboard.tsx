@@ -1915,33 +1915,62 @@ export default function BranchManagerDashboard({ org, staff, onLogout, isSimulat
       return;
     }
     setGroupMembers(updatedMembersList);
+    try {
+      localStorage.setItem(`tanzil_group_members_${org.id}`, JSON.stringify(updatedMembersList));
+    } catch (e) {
+      console.error(e);
+    }
     
     // Find the updated member profile to sync specific ledger account list balances
     const updatedMember = updatedMembersList.find(m => m.memberId === txDetails.memberId || m.id === txDetails.memberId);
     if (updatedMember) {
       // 1. Sync active General Savings (GS) account balance
-      setSavingsAccounts((prev) => prev.map((acc) => {
-        if ((acc.memberId === updatedMember.id || acc.memberId === updatedMember.memberId || acc.memberCode === updatedMember.memberId) && acc.type === 'GS') {
-          return { ...acc, balance: updatedMember.savingsBalance ?? updatedMember.gsBalance ?? 0 };
+      setSavingsAccounts((prev) => {
+        const next = prev.map((acc) => {
+          if ((acc.memberId === updatedMember.id || acc.memberId === updatedMember.memberId || acc.memberCode === updatedMember.memberId) && acc.type === 'GS') {
+            return { ...acc, balance: updatedMember.savingsBalance ?? updatedMember.gsBalance ?? 0 };
+          }
+          return acc;
+        });
+        try {
+          localStorage.setItem(`tanzil_savings_accounts_${org.id}`, JSON.stringify(next));
+        } catch (e) {
+          console.error(e);
         }
-        return acc;
-      }));
+        return next;
+      });
 
       // 2. Sync active CBS Account balance
-      setCbsAccounts((prev) => prev.map((acc) => {
-        if (acc.memberId === updatedMember.id || acc.memberId === updatedMember.memberId || acc.memberCode === updatedMember.memberId) {
-          return { ...acc, balance: updatedMember.cbsBalance ?? 0 };
+      setCbsAccounts((prev) => {
+        const next = prev.map((acc) => {
+          if (acc.memberId === updatedMember.id || acc.memberId === updatedMember.memberId || acc.memberCode === updatedMember.memberId) {
+            return { ...acc, balance: updatedMember.cbsBalance ?? 0 };
+          }
+          return acc;
+        });
+        try {
+          localStorage.setItem(`tanzil_cbs_accounts_${org.id}`, JSON.stringify(next));
+        } catch (e) {
+          console.error(e);
         }
-        return acc;
-      }));
+        return next;
+      });
 
       // 3. Sync active LTS Account balance
-      setLtsAccounts((prev) => prev.map((acc) => {
-        if (acc.memberId === updatedMember.id || acc.memberId === updatedMember.memberId || acc.memberCode === updatedMember.memberId) {
-          return { ...acc, balance: updatedMember.ltsBalance ?? 0 };
+      setLtsAccounts((prev) => {
+        const next = prev.map((acc) => {
+          if (acc.memberId === updatedMember.id || acc.memberId === updatedMember.memberId || acc.memberCode === updatedMember.memberId) {
+            return { ...acc, balance: updatedMember.ltsBalance ?? 0 };
+          }
+          return acc;
+        });
+        try {
+          localStorage.setItem(`tanzil_lts_accounts_${org.id}`, JSON.stringify(next));
+        } catch (e) {
+          console.error(e);
         }
-        return acc;
-      }));
+        return next;
+      });
     }
 
     setTransactions((prev) => {
@@ -3754,10 +3783,6 @@ export default function BranchManagerDashboard({ org, staff, onLogout, isSimulat
                     <button
                       type="button"
                       onClick={() => {
-                        if (isBM) {
-                          alert('শাখা ব্যবস্থাপক (BM) কোনো সদস্যের সঞ্চয় ফেরত বা ডেলি কালেকশনে লেনদেন প্রদান করতে পারবেন না। এটি মাঠ কর্মীর দায়িত্ব।');
-                          return;
-                        }
                         setSelectedOperation('group_operation');
                         if (selectedGroupIdForSearch) {
                           setActiveCardView('realized_information');
@@ -5400,7 +5425,7 @@ export default function BranchManagerDashboard({ org, staff, onLogout, isSimulat
               )}
 
               {/* SECTION: SAVINGS REFUND AND ADJUSTMENT APPROVAL */}
-              {selectedOperation === 'savings_refund_and_adjustment' && (
+              {(selectedOperation === 'savings_refund_and_adjustment' || selectedOperation === 'savings_refund_approval') && (
                 <div id="bm_sub_savings_refund_and_adjustment" className="max-w-6xl mx-auto animate-in fade-in duration-200 max-sm:fixed max-sm:inset-0 max-sm:z-[100] max-sm:overflow-y-auto max-sm:bg-white max-sm:p-4 max-sm:rounded-none">
                   <div className="flex justify-between items-center bg-white rounded-t-2xl border-t border-x border-slate-200 p-4 font-sans">
                     <h3 className="font-extrabold text-slate-800 text-sm sm:text-base flex items-center gap-1.5">
@@ -5426,6 +5451,10 @@ export default function BranchManagerDashboard({ org, staff, onLogout, isSimulat
                     onUpdateSavingsAccounts={setSavingsAccounts}
                     onUpdateTransactions={setTransactions}
                     savingsAccounts={savingsAccounts}
+                    cbsAccounts={cbsAccounts}
+                    onUpdateCbsAccounts={setCbsAccounts}
+                    ltsAccounts={ltsAccounts}
+                    onUpdateLtsAccounts={setLtsAccounts}
                     mode={isBM ? undefined : 'refund'}
                   />
                 </div>

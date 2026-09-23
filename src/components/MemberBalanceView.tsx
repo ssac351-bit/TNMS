@@ -54,14 +54,14 @@ export const MemberBalanceView: React.FC<MemberBalanceViewProps> = ({
   const [selectedGroupId, setSelectedGroupId] = useState<string>('');
   const [selectedStatement, setSelectedStatement] = useState<{
     member: Member;
-    accountType: 'PL' | 'GS' | 'CBS' | 'LTS';
+    accountType: 'PL' | 'GS' | 'CBS' | 'LTS' | 'SHARE';
     accountName: string;
     accountNo?: string;
     balance: number;
   } | null>(null);
 
   // Helper: compute statement rows with running balances
-  const getAccountStatement = (memberObj: any, type: 'PL' | 'GS' | 'CBS' | 'LTS') => {
+  const getAccountStatement = (memberObj: any, type: 'PL' | 'GS' | 'CBS' | 'LTS' | 'SHARE') => {
     const mTxList = (transactions || []).filter(
       (t) => t.memberId === memberObj.memberId || t.memberId === memberObj.id
     );
@@ -72,6 +72,32 @@ export const MemberBalanceView: React.FC<MemberBalanceViewProps> = ({
     const items: any[] = [];
 
     if (type === 'PL') {
+      const finalOutstanding = memberObj.plOutstanding ?? 0;
+      let totalRepaid = 0;
+      let hasDisbursementTx = false;
+
+      sortedTx.forEach((t) => {
+        if (t.type === 'disbursement') {
+          hasDisbursementTx = true;
+        } else if (t.type === 'collection' && t.collections?.pl > 0) {
+          totalRepaid += t.collections.pl;
+        } else if (t.type === 'loan_repayment' || t.category === 'loan_installment') {
+          totalRepaid += t.amount || 0;
+        }
+      });
+
+      if (!hasDisbursementTx && (finalOutstanding > 0 || totalRepaid > 0)) {
+        const estimatedOriginalLoan = finalOutstanding + totalRepaid;
+        runningBal = estimatedOriginalLoan;
+        items.push({
+          date: memberObj.admissionDate || memberObj.addDate || 'প্রারম্ভিক',
+          title: 'ঋণ প্রারম্ভিক স্থিতি (Original Loan)',
+          debit: estimatedOriginalLoan,
+          credit: 0,
+          balance: runningBal,
+        });
+      }
+
       sortedTx.forEach((t) => {
         let isTxRelated = false;
         let title = '';
@@ -87,7 +113,12 @@ export const MemberBalanceView: React.FC<MemberBalanceViewProps> = ({
           isTxRelated = true;
           title = 'ঋণ কিস্তি আদায় (Installment Paid)';
           credit = t.collections.pl;
-          runningBal -= credit;
+          runningBal = Math.max(0, runningBal - credit);
+        } else if (t.type === 'loan_repayment' || t.category === 'loan_installment') {
+          isTxRelated = true;
+          title = t.description || 'ঋণ কিস্তি আদায় (Loan Repaid)';
+          credit = t.amount || 0;
+          runningBal = Math.max(0, runningBal - credit);
         }
 
         if (isTxRelated) {
@@ -110,6 +141,8 @@ export const MemberBalanceView: React.FC<MemberBalanceViewProps> = ({
           if (t.withdrawals?.gs > 0) netChange -= t.withdrawals.gs;
         } else if (t.type === 'savings_deposit' || t.category === 'savings_interest' || t.category === 'fdr_interest') {
           netChange += t.amount || 0;
+        } else if (t.type === 'savings_withdrawal' || t.category === 'savings_refund' || (t.isRefund && t.category === 'general_savings')) {
+          netChange -= t.amount || 0;
         }
       });
 
@@ -146,7 +179,80 @@ export const MemberBalanceView: React.FC<MemberBalanceViewProps> = ({
             debit: deposit,
             credit: 0,
             balance: currentTempBal,
-            category: t.category, // Pass category to identify it in Passbook
+            category: t.category,
+          });
+        } else if (t.type === 'savings_withdrawal' || t.category === 'savings_refund' || (t.isRefund && t.category === 'general_savings')) {
+          const withdraw = t.amount || 0;
+          currentTempBal = Math.max(0, currentTempBal - withdraw);
+          items.push({
+            date: t.date || t.addDate,
+            title: t.description || 'সঞ্চয় ফেরত/উত্তোলন (Withdrawal)',
+            debit: 0,
+            credit: withdraw,
+            balance: currentTempBal,
+          });
+        }
+      });
+    } else if (type === 'SHARE') {
+      const sharePrice = Number((org as any)?.sharePrice || 10);
+      const finalBal = memberObj.shareBalance ?? ((memberObj.shareCount ?? 1) * sharePrice);
+      let netChange = 0;
+
+      sortedTx.forEach((t) => {
+        if (t.type === 'collection') {
+          if (t.collections?.share > 0) netChange += t.collections.share;
+          if (t.withdrawals?.share > 0) netChange -= t.withdrawals.share;
+        } else if (t.type === 'share_deposit' || t.type === 'share_purchase' || t.category === 'share_dividend') {
+          netChange += t.amount || 0;
+        } else if (t.type === 'share_refund' || t.type === 'share_surrender' || t.type === 'share_withdrawal') {
+          netChange -= t.amount || 0;
+        }
+      });
+
+      let currentTempBal = Math.max(0, finalBal - netChange);
+      items.push({
+        date: memberObj.admissionDate || memberObj.addDate || 'প্রারম্ভিক',
+        title: 'প্রারম্ভিক শেয়ার মূলধন (Opening Share)',
+        debit: currentTempBal,
+        credit: 0,
+        balance: currentTempBal,
+      });
+
+      sortedTx.forEach((t) => {
+        if (t.type === 'collection') {
+          const deposit = t.collections?.share || 0;
+          const withdraw = t.withdrawals?.share || 0;
+
+          if (deposit > 0 || withdraw > 0) {
+            currentTempBal = currentTempBal + deposit - withdraw;
+            items.push({
+              date: t.date || t.addDate,
+              title: deposit > 0 ? 'শেয়ার ক্রয়/জমা (Share Deposit)' : 'শেয়ার প্রত্যাহার (Share Refund)',
+              debit: deposit,
+              credit: withdraw,
+              balance: currentTempBal,
+            });
+          }
+        } else if (t.type === 'share_deposit' || t.type === 'share_purchase' || t.category === 'share_dividend') {
+          const deposit = t.amount || 0;
+          currentTempBal = currentTempBal + deposit;
+          items.push({
+            date: t.date || t.addDate,
+            title: t.description || (t.category === 'share_dividend' ? 'শেয়ার লভ্যাংশ (Share Dividend)' : 'শেয়ার ক্রয় (Share Purchase)'),
+            debit: deposit,
+            credit: 0,
+            balance: currentTempBal,
+            category: t.category,
+          });
+        } else if (t.type === 'share_refund' || t.type === 'share_surrender' || t.type === 'share_withdrawal') {
+          const withdraw = t.amount || 0;
+          currentTempBal = Math.max(0, currentTempBal - withdraw);
+          items.push({
+            date: t.date || t.addDate,
+            title: t.description || 'শেয়ার ফেরত (Share Refund)',
+            debit: 0,
+            credit: withdraw,
+            balance: currentTempBal,
           });
         }
       });
@@ -158,6 +264,8 @@ export const MemberBalanceView: React.FC<MemberBalanceViewProps> = ({
         if (t.type === 'collection') {
           if (t.collections?.cbs > 0) netChange += t.collections.cbs;
           if (t.withdrawals?.cbs > 0) netChange -= t.withdrawals.cbs;
+        } else if (t.type === 'savings_withdrawal' && t.category === 'cbs_savings') {
+          netChange -= t.amount || 0;
         }
       });
 
@@ -185,6 +293,16 @@ export const MemberBalanceView: React.FC<MemberBalanceViewProps> = ({
               balance: currentTempBal,
             });
           }
+        } else if (t.type === 'savings_withdrawal' && t.category === 'cbs_savings') {
+          const withdraw = t.amount || 0;
+          currentTempBal = Math.max(0, currentTempBal - withdraw);
+          items.push({
+            date: t.date || t.addDate,
+            title: t.description || 'CBS উত্তোলন/ফেরত',
+            debit: 0,
+            credit: withdraw,
+            balance: currentTempBal,
+          });
         }
       });
     } else if (type === 'LTS') {
@@ -192,8 +310,11 @@ export const MemberBalanceView: React.FC<MemberBalanceViewProps> = ({
       let netChange = 0;
 
       sortedTx.forEach((t) => {
-        if (t.type === 'collection' && t.collections?.lts > 0) {
-          netChange += t.collections.lts;
+        if (t.type === 'collection') {
+          if (t.collections?.lts > 0) netChange += t.collections.lts;
+          if (t.withdrawals?.lts > 0) netChange -= t.withdrawals.lts;
+        } else if (t.type === 'savings_withdrawal' && t.category === 'lts_savings') {
+          netChange -= t.amount || 0;
         }
       });
 
@@ -209,17 +330,28 @@ export const MemberBalanceView: React.FC<MemberBalanceViewProps> = ({
       sortedTx.forEach((t) => {
         if (t.type === 'collection') {
           const deposit = t.collections?.lts || 0;
+          const withdraw = t.withdrawals?.lts || 0;
 
-          if (deposit > 0) {
-            currentTempBal = currentTempBal + deposit;
+          if (deposit > 0 || withdraw > 0) {
+            currentTempBal = currentTempBal + deposit - withdraw;
             items.push({
               date: t.date || t.addDate,
-              title: 'LTS সঞ্চয় জমা (Deposit)',
+              title: deposit > 0 ? 'LTS সঞ্চয় জমা (Deposit)' : 'LTS সঞ্চয় উত্তোলন (Withdrawal)',
               debit: deposit,
-              credit: 0,
+              credit: withdraw,
               balance: currentTempBal,
             });
           }
+        } else if (t.type === 'savings_withdrawal' && t.category === 'lts_savings') {
+          const withdraw = t.amount || 0;
+          currentTempBal = Math.max(0, currentTempBal - withdraw);
+          items.push({
+            date: t.date || t.addDate,
+            title: t.description || 'LTS সঞ্চয় ফেরত/উত্তোলন',
+            debit: 0,
+            credit: withdraw,
+            balance: currentTempBal,
+          });
         }
       });
     }
@@ -574,6 +706,117 @@ export const MemberBalanceView: React.FC<MemberBalanceViewProps> = ({
                   <span className="text-[10px] font-black text-blue-800 uppercase tracking-wider">মোট বর্তমান স্থিতি (Balance):</span>
                   <span className="text-xs sm:text-sm font-black text-blue-900 font-mono">৳{selectedStatement.balance.toLocaleString('bn-BD')}</span>
                 </div>
+              </div>
+
+              {/* Quick Account Switcher Bar */}
+              <div className="bg-slate-100 border-b border-slate-200 px-3 py-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+                <span className="text-[9px] font-bold text-slate-500 shrink-0">হিসাব নির্বাচন:</span>
+
+                {/* GS Tab */}
+                <button
+                  type="button"
+                  onClick={() => setSelectedStatement({
+                    member: selectedStatement.member,
+                    accountType: 'GS',
+                    accountName: 'সাধারণ সঞ্চয় (GS)',
+                    accountNo: selectedStatement.member?.savingsAccountNo || `SAV-GS-${selectedStatement.member?.memberId || selectedStatement.member?.id}`,
+                    balance: selectedStatement.member?.savingsBalance || selectedStatement.member?.gsBalance || 0
+                  })}
+                  className={`px-2.5 py-1 rounded-full text-[10px] font-bold shrink-0 transition-all cursor-pointer ${
+                    selectedStatement.accountType === 'GS'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+                  }`}
+                >
+                  GS (সাধারণ সঞ্চয়)
+                </button>
+
+                {/* Share Tab */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const sPrice = Number((org as any)?.sharePrice || 10);
+                    const sCount = selectedStatement.member?.shareCount ?? 1;
+                    const sBal = Number(selectedStatement.member?.shareBalance ?? (sCount * sPrice));
+                    setSelectedStatement({
+                      member: selectedStatement.member,
+                      accountType: 'SHARE',
+                      accountName: 'শেয়ার আমানত হিসাব (Share Capital)',
+                      accountNo: selectedStatement.member?.shareAccountNo || `SHR-${selectedStatement.member?.memberId || selectedStatement.member?.id}`,
+                      balance: sBal
+                    });
+                  }}
+                  className={`px-2.5 py-1 rounded-full text-[10px] font-bold shrink-0 transition-all cursor-pointer ${
+                    selectedStatement.accountType === 'SHARE'
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+                  }`}
+                >
+                  Share (শেয়ার)
+                </button>
+
+                {/* PL Tab */}
+                {(selectedStatement.member?.plOutstanding ?? 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedStatement({
+                      member: selectedStatement.member,
+                      accountType: 'PL',
+                      accountName: 'প্রাথমিক ঋণ হিসাব (PL)',
+                      accountNo: selectedStatement.member?.loanAccountNo || `LN-${selectedStatement.member?.memberId || selectedStatement.member?.id}`,
+                      balance: selectedStatement.member?.plOutstanding || 0
+                    })}
+                    className={`px-2.5 py-1 rounded-full text-[10px] font-bold shrink-0 transition-all cursor-pointer ${
+                      selectedStatement.accountType === 'PL'
+                        ? 'bg-rose-600 text-white shadow-xs'
+                        : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+                    }`}
+                  >
+                    PL (ঋণ)
+                  </button>
+                )}
+
+                {/* CBS Tab */}
+                {(selectedStatement.member?.cbsBalance ?? 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedStatement({
+                      member: selectedStatement.member,
+                      accountType: 'CBS',
+                      accountName: 'ক্যাপিটাল বিল্ড-আপ সঞ্চয় (CBS)',
+                      accountNo: selectedStatement.member?.cbsAccountNo || `CBS-${selectedStatement.member?.memberId || selectedStatement.member?.id}`,
+                      balance: selectedStatement.member?.cbsBalance || 0
+                    })}
+                    className={`px-2.5 py-1 rounded-full text-[10px] font-bold shrink-0 transition-all cursor-pointer ${
+                      selectedStatement.accountType === 'CBS'
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+                    }`}
+                  >
+                    CBS (ডিপিএস)
+                  </button>
+                )}
+
+                {/* LTS Tab */}
+                {(selectedStatement.member?.ltsBalance ?? 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedStatement({
+                      member: selectedStatement.member,
+                      accountType: 'LTS',
+                      accountName: 'দীর্ঘমেয়াদী সঞ্চয় (LTS)',
+                      accountNo: selectedStatement.member?.ltsAccountNo || `LTS-${selectedStatement.member?.memberId || selectedStatement.member?.id}`,
+                      balance: selectedStatement.member?.ltsBalance || 0
+                    })}
+                    className={`px-2.5 py-1 rounded-full text-[10px] font-bold shrink-0 transition-all cursor-pointer ${
+                      selectedStatement.accountType === 'LTS'
+                        ? 'bg-teal-600 text-white shadow-xs'
+                        : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
+                    }`}
+                  >
+                    LTS (দীর্ঘমেয়াদী)
+                  </button>
+                )}
               </div>
 
               {/* Statement Passbook Table */}

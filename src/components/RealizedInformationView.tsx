@@ -233,6 +233,76 @@ export const RealizedInformationView: React.FC<RealizedInformationViewProps> = (
     });
   }, [refundRequests, mode]);
 
+  // Find matching account for selected member and product
+  const currentSavingsAccount = useMemo(() => {
+    if (!selectedMember) return null;
+    const prod = productName?.toLowerCase() || '';
+    if (prod.includes('lts')) {
+      return ltsAccounts.find(a => (a.memberId === selectedMember.id || a.memberId === selectedMember.memberId || a.memberCode === selectedMember.memberId) && a.status === 'active') ||
+             ltsAccounts.find(a => a.memberId === selectedMember.id || a.memberId === selectedMember.memberId) || null;
+    }
+    if (prod.includes('cbs')) {
+      return cbsAccounts.find(a => (a.memberId === selectedMember.id || a.memberId === selectedMember.memberId || a.memberCode === selectedMember.memberId) && a.status === 'active') ||
+             cbsAccounts.find(a => a.memberId === selectedMember.id || a.memberId === selectedMember.memberId) || null;
+    }
+    return savingsAccounts.find(a => (a.memberId === selectedMember.id || a.memberId === selectedMember.memberId || a.memberCode === selectedMember.memberId) && a.type === 'GS' && a.status === 'active') ||
+           savingsAccounts.find(a => (a.memberId === selectedMember.id || a.memberId === selectedMember.memberId) && a.type === 'GS') || null;
+  }, [selectedMember, productName, savingsAccounts, cbsAccounts, ltsAccounts]);
+
+  const getStoredRate = (key: string, fallback: number) => {
+    try {
+      const saved = localStorage.getItem(`tanzil_${key}_${orgId}`);
+      if (!saved) return fallback;
+      const eng = saved.replace(/[০-৯]/g, (d: string) => String.fromCharCode(d.charCodeAt(0) - 2406 + 48));
+      const parsed = parseFloat(eng);
+      return isNaN(parsed) ? fallback : parsed;
+    } catch {
+      return fallback;
+    }
+  };
+
+  const annualInterestRate = useMemo(() => {
+    const prod = productName?.toLowerCase() || '';
+    if (prod.includes('lts')) {
+      if (status === 'Closing') {
+        return currentSavingsAccount?.interestRate || getStoredRate('sav_profit_lts', 12);
+      }
+      return currentSavingsAccount?.prematureRate || 6.0;
+    }
+    if (prod.includes('cbs')) {
+      return currentSavingsAccount?.interestRate || getStoredRate('sav_profit_cbs', 8.5);
+    }
+    return currentSavingsAccount?.interestRate || getStoredRate('sav_profit_gs', 6.0);
+  }, [productName, status, currentSavingsAccount, orgId]);
+
+  // Elapsed months between openingDate and returnDate (or adjustDate/workingDay)
+  const elapsedMonths = useMemo(() => {
+    try {
+      const parseDate = (dStr: string) => {
+        if (!dStr) return new Date();
+        if (dStr.includes('-')) {
+          const parts = dStr.split('-');
+          if (parts[0].length === 4) {
+            return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+          } else if (parts[2].length === 4) {
+            return new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+          }
+        }
+        return new Date(dStr);
+      };
+
+      const actOpDate = currentSavingsAccount?.openingDate || currentSavingsAccount?.addDate || selectedMember?.admissionDate || openingDate;
+      const actEndDate = returnDate || adjustDate || workingDay || new Date().toISOString().split('T')[0];
+      const start = parseDate(actOpDate);
+      const end = parseDate(actEndDate);
+      const diffMs = Math.max(0, end.getTime() - start.getTime());
+      const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      return Math.max(1, Math.floor(days / 30));
+    } catch {
+      return 1;
+    }
+  }, [currentSavingsAccount, selectedMember, openingDate, returnDate, adjustDate, workingDay]);
+
   // Calculate default values based on member balances
   const savingsBalance = useMemo(() => {
     if (!selectedMember) return 0;
@@ -246,6 +316,36 @@ export const RealizedInformationView: React.FC<RealizedInformationViewProps> = (
     return selectedMember.gsBalance ?? selectedMember.savingsBalance ?? 0;
   }, [selectedMember, productName]);
   const loanOutstanding = selectedMember ? (selectedMember.plOutstanding ?? 0) : 0;
+
+  // Auto-calculated profit on savings
+  const autoCalculatedProfit = useMemo(() => {
+    if (savingsBalance <= 0) return 0;
+    if (currentSavingsAccount && typeof currentSavingsAccount.accumulatedProfit === 'number' && currentSavingsAccount.accumulatedProfit > 0) {
+      return currentSavingsAccount.accumulatedProfit;
+    }
+    if (currentSavingsAccount && typeof currentSavingsAccount.profit === 'number' && currentSavingsAccount.profit > 0) {
+      return currentSavingsAccount.profit;
+    }
+    const intVal = Math.round(savingsBalance * (annualInterestRate / 100) * (elapsedMonths / 12));
+    return Math.max(0, intVal);
+  }, [savingsBalance, currentSavingsAccount, annualInterestRate, elapsedMonths]);
+
+  // Sync profit state automatically
+  useEffect(() => {
+    setProfit(autoCalculatedProfit);
+  }, [autoCalculatedProfit]);
+
+  // Sync account metadata (opening date, installments) on account select
+  useEffect(() => {
+    if (currentSavingsAccount) {
+      if (currentSavingsAccount.openingDate) setOpeningDate(currentSavingsAccount.openingDate);
+      if (currentSavingsAccount.termMonths) setDuration(String(currentSavingsAccount.termMonths));
+      if (currentSavingsAccount.cbsInstallment) setMinimumDeposit(currentSavingsAccount.cbsInstallment);
+      if (currentSavingsAccount.monthlyInstallment) setMinimumDeposit(currentSavingsAccount.monthlyInstallment);
+    } else if (selectedMember?.admissionDate) {
+      setOpeningDate(selectedMember.admissionDate);
+    }
+  }, [currentSavingsAccount, selectedMember]);
 
   // Total Return = Savings Balance + Profit
   const totalReturn = useMemo(() => {
@@ -285,7 +385,6 @@ export const RealizedInformationView: React.FC<RealizedInformationViewProps> = (
     setIsFormOpen(false);
     setManualReturnAmount('');
     setManualAdjustedAmount('');
-    setProfit(0);
   };
 
   // Format date nicely
@@ -328,12 +427,145 @@ export const RealizedInformationView: React.FC<RealizedInformationViewProps> = (
       return;
     }
 
-    // Save to localStorage refund requests as pending for BM approval
+    const targetMember = selectedMember;
+    const isLts = productName?.toLowerCase()?.includes('lts');
+    const isCbs = productName?.toLowerCase()?.includes('cbs');
+
+    // 1. Calculate new member balances
+    const balanceDeduction = status === 'Closing' 
+      ? savingsBalance 
+      : Math.max(0, returnAmt + adjustedAmt - profit);
+    const newSavingsBal = Math.max(0, savingsBalance - balanceDeduction);
+    const newPlOutstanding = Math.max(0, loanOutstanding - adjustedAmt);
+
+    const updatedMembers = groupMembers.map((m) => {
+      if (m.id === targetMember.id || m.memberId === targetMember.memberId || m.id === targetMember.memberId) {
+        if (isLts) {
+          return {
+            ...m,
+            ltsBalance: newSavingsBal,
+            plOutstanding: newPlOutstanding
+          };
+        } else if (isCbs) {
+          return {
+            ...m,
+            cbsBalance: newSavingsBal,
+            plOutstanding: newPlOutstanding
+          };
+        } else {
+          return {
+            ...m,
+            gsBalance: newSavingsBal,
+            savingsBalance: newSavingsBal,
+            plOutstanding: newPlOutstanding
+          };
+        }
+      }
+      return m;
+    });
+
+    // 2. Update account lists
+    let updatedGeneralAccounts = [...savingsAccounts];
+    let updatedCbs = [...cbsAccounts];
+    let updatedLts = [...ltsAccounts];
+
+    if (isLts) {
+      updatedLts = ltsAccounts.map((acc) => {
+        if ((acc.memberId === targetMember.id || acc.memberId === targetMember.memberId || acc.memberCode === targetMember.memberId) && (acc.type === 'LTS' || !acc.type)) {
+          return {
+            ...acc,
+            balance: newSavingsBal,
+            status: status === 'Closing' ? 'closed' : 'active'
+          };
+        }
+        return acc;
+      });
+      if (onUpdateLtsAccounts) onUpdateLtsAccounts(updatedLts);
+      try {
+        localStorage.setItem(`tanzil_lts_accounts_${targetMember.orgId || orgId}`, JSON.stringify(updatedLts));
+      } catch (err) {
+        console.error(err);
+      }
+    } else if (isCbs) {
+      updatedCbs = cbsAccounts.map((acc) => {
+        if ((acc.memberId === targetMember.id || acc.memberId === targetMember.memberId || acc.memberCode === targetMember.memberId) && (acc.type === 'CBS' || !acc.type)) {
+          return {
+            ...acc,
+            balance: newSavingsBal,
+            status: status === 'Closing' ? 'closed' : 'active'
+          };
+        }
+        return acc;
+      });
+      if (onUpdateCbsAccounts) onUpdateCbsAccounts(updatedCbs);
+      try {
+        localStorage.setItem(`tanzil_cbs_accounts_${targetMember.orgId || orgId}`, JSON.stringify(updatedCbs));
+      } catch (err) {
+        console.error(err);
+      }
+    } else {
+      updatedGeneralAccounts = savingsAccounts.map((acc) => {
+        if ((acc.memberId === targetMember.id || acc.memberId === targetMember.memberId || acc.memberCode === targetMember.memberId) && (acc.type === 'GS' || !acc.type)) {
+          return {
+            ...acc,
+            balance: newSavingsBal,
+            status: status === 'Closing' ? 'closed' : 'active'
+          };
+        }
+        return acc;
+      });
+      onUpdateSavingsAccounts(updatedGeneralAccounts);
+      try {
+        localStorage.setItem(`tanzil_savings_accounts_${targetMember.orgId || orgId}`, JSON.stringify(updatedGeneralAccounts));
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // 3. Transactions
+    const newTransactions = [...transactions];
+    if (returnAmt > 0) {
+      newTransactions.push({
+        id: `tx-ret-${Date.now()}-1`,
+        orgId: targetMember.orgId || orgId,
+        memberId: targetMember.memberId || targetMember.id,
+        memberName: targetMember.name,
+        type: 'savings_withdrawal',
+        amount: returnAmt,
+        date: returnDate,
+        groupId: selectedGroupId,
+        groupName: selectedGroup?.name || '',
+        category: isLts ? 'lts_savings' : isCbs ? 'cbs_savings' : 'general_savings',
+        debitAcc: isLts ? 'lts_savings' : isCbs ? 'cbs_savings' : 'general_savings',
+        creditAcc: 'cash',
+        isRefund: status === 'Closing',
+        description: status === 'Closing' ? 'সঞ্চয় ফেরত' : 'সঞ্চয় উত্তোলন'
+      });
+    }
+    if (adjustedAmt > 0) {
+      newTransactions.push({
+        id: `tx-ret-${Date.now()}-2`,
+        orgId: targetMember.orgId || orgId,
+        memberId: targetMember.memberId || targetMember.id,
+        memberName: targetMember.name,
+        type: 'loan_repayment',
+        amount: adjustedAmt,
+        date: adjustDate,
+        groupId: selectedGroupId,
+        groupName: selectedGroup?.name || '',
+        category: 'loan_installment',
+        debitAcc: isLts ? 'lts_savings' : isCbs ? 'cbs_savings' : 'general_savings',
+        creditAcc: 'loan_outstanding',
+        description: 'ঋণ সমন্বয়'
+      });
+    }
+
+    // 4. Record the refund as approved
     const newRequest: SavingsRefundRequest = {
       id: `ref-${Date.now()}`,
-      memberId: selectedMember.id,
-      memberName: selectedMember.name,
-      memberCode: selectedMember.memberId || '',
+      memberId: targetMember.id,
+      memberName: targetMember.name,
+      memberCode: targetMember.memberId || '',
       groupId: selectedGroupId,
       groupName: selectedGroup?.name || '',
       openingDate,
@@ -352,27 +584,41 @@ export const RealizedInformationView: React.FC<RealizedInformationViewProps> = (
       notes,
       createdAt: new Date().toISOString(),
       profit: profit,
-      approvalStatus: 'pending',
-      orgId: selectedMember.orgId
+      approvalStatus: 'approved',
+      orgId: targetMember.orgId || orgId
     };
 
     try {
-      const savedRefunds = JSON.parse(localStorage.getItem(`tanzil_savings_refunds_${selectedMember.orgId}`) || '[]');
-      localStorage.setItem(`tanzil_savings_refunds_${selectedMember.orgId}`, JSON.stringify([newRequest, ...savedRefunds]));
+      const savedRefunds = JSON.parse(localStorage.getItem(`tanzil_savings_refunds_${targetMember.orgId || orgId}`) || '[]');
+      localStorage.setItem(`tanzil_savings_refunds_${targetMember.orgId || orgId}`, JSON.stringify([newRequest, ...savedRefunds]));
+    } catch (e) {
+      console.error(e);
+    }
+
+    // 5. Update state & immediate localStorage persistence
+    onUpdateMembers(updatedMembers);
+    try {
+      localStorage.setItem(`tanzil_group_members_${targetMember.orgId || orgId}`, JSON.stringify(updatedMembers));
+    } catch (e) {
+      console.error(e);
+    }
+
+    onUpdateTransactions(newTransactions);
+    try {
+      localStorage.setItem(`tanzil_transactions_${targetMember.orgId || orgId}`, JSON.stringify(newTransactions));
     } catch (e) {
       console.error(e);
     }
 
     setRefreshKey(prev => prev + 1);
-
-    // Show success dialog indicating that it is pending BM approval
-    setSuccessMessage('সঞ্চয় ফেরত ও ঋণ সমন্বয় আবেদনটি সফলভাবে জমা দেওয়া হয়েছে! বিএম পেজে অনুমোদনের জন্য অপেক্ষমান থাকবে।');
     setIsFormOpen(false);
+    setSuccessMessage(`সদস্য ${targetMember.name} এর সঞ্চয় ফেরত ও সমন্বয় সফলভাবে সম্পন্ন হয়েছে এবং ব্যালেন্স হালনাগাদ করা হয়েছে!`);
+    alert(`সদস্য ${targetMember.name} এর সঞ্চয় ফেরত ও সমন্বয় সফলভাবে সম্পন্ন হয়েছে এবং ব্যালেন্স হালনাগাদ করা হয়েছে!`);
   };
 
   const handleApproveRequest = (req: SavingsRefundRequest) => {
     // 1. Find target member
-    const targetMember = groupMembers.find(m => m.id === req.memberId);
+    const targetMember = groupMembers.find(m => m.id === req.memberId || m.memberId === req.memberId || m.id === req.memberCode || m.memberId === req.memberCode);
     if (!targetMember) {
       alert('দুঃখিত, আবেদনকারী সদস্যটিকে খুঁজে পাওয়া যায়নি!');
       return;
@@ -387,8 +633,11 @@ export const RealizedInformationView: React.FC<RealizedInformationViewProps> = (
 
     // 2. Prepare updated member's balances
     const updatedMembers = groupMembers.map((m) => {
-      if (m.id === req.memberId) {
-        const balanceDeduction = Math.max(0, returnAmt + adjustedAmt - profitAmt);
+      const isTarget = m.id === req.memberId || m.memberId === req.memberId || m.id === req.memberCode || m.memberId === req.memberCode;
+      if (isTarget) {
+        const balanceDeduction = req.status === 'Closing' 
+          ? (isLts ? (m.ltsBalance ?? 0) : isCbs ? (m.cbsBalance ?? 0) : (m.gsBalance ?? m.savingsBalance ?? 0))
+          : Math.max(0, returnAmt + adjustedAmt - profitAmt);
         const newPlOutstanding = Math.max(0, (m.plOutstanding ?? 0) - adjustedAmt);
 
         if (isLts) {
@@ -407,10 +656,10 @@ export const RealizedInformationView: React.FC<RealizedInformationViewProps> = (
           };
         } else {
           const currentBal = m.gsBalance ?? m.savingsBalance ?? 0;
-          const newSavingsBalance = Math.max(0, (m.savingsBalance ?? 0) - balanceDeduction);
+          const newSavingsBalance = Math.max(0, currentBal - balanceDeduction);
           return {
             ...m,
-            gsBalance: Math.max(0, currentBal - balanceDeduction),
+            gsBalance: newSavingsBalance,
             savingsBalance: newSavingsBalance,
             plOutstanding: newPlOutstanding
           };
@@ -423,9 +672,9 @@ export const RealizedInformationView: React.FC<RealizedInformationViewProps> = (
     let updatedGeneralAccounts = [...savingsAccounts];
     if (isLts) {
       const updatedLts = ltsAccounts.map((acc) => {
-        if (acc.memberId === req.memberId && acc.type === 'LTS') {
+        if ((acc.memberId === req.memberId || acc.memberId === req.memberCode || acc.memberCode === req.memberCode || acc.memberId === targetMember.id) && (acc.type === 'LTS' || !acc.type)) {
           const currentBal = acc.balance ?? 0;
-          const balanceDeduction = Math.max(0, returnAmt + adjustedAmt - profitAmt);
+          const balanceDeduction = req.status === 'Closing' ? currentBal : Math.max(0, returnAmt + adjustedAmt - profitAmt);
           return {
             ...acc,
             balance: Math.max(0, currentBal - balanceDeduction),
@@ -436,13 +685,17 @@ export const RealizedInformationView: React.FC<RealizedInformationViewProps> = (
       });
       if (onUpdateLtsAccounts) {
         onUpdateLtsAccounts(updatedLts);
-        localStorage.setItem(`tanzil_lts_accounts_${orgId}`, JSON.stringify(updatedLts));
+        try {
+          localStorage.setItem(`tanzil_lts_accounts_${orgId}`, JSON.stringify(updatedLts));
+        } catch (e) {
+          console.error(e);
+        }
       }
     } else if (isCbs) {
       const updatedCbs = cbsAccounts.map((acc) => {
-        if (acc.memberId === req.memberId && acc.type === 'CBS') {
+        if ((acc.memberId === req.memberId || acc.memberId === req.memberCode || acc.memberCode === req.memberCode || acc.memberId === targetMember.id) && (acc.type === 'CBS' || !acc.type)) {
           const currentBal = acc.balance ?? 0;
-          const balanceDeduction = Math.max(0, returnAmt + adjustedAmt - profitAmt);
+          const balanceDeduction = req.status === 'Closing' ? currentBal : Math.max(0, returnAmt + adjustedAmt - profitAmt);
           return {
             ...acc,
             balance: Math.max(0, currentBal - balanceDeduction),
@@ -453,13 +706,17 @@ export const RealizedInformationView: React.FC<RealizedInformationViewProps> = (
       });
       if (onUpdateCbsAccounts) {
         onUpdateCbsAccounts(updatedCbs);
-        localStorage.setItem(`tanzil_cbs_accounts_${orgId}`, JSON.stringify(updatedCbs));
+        try {
+          localStorage.setItem(`tanzil_cbs_accounts_${orgId}`, JSON.stringify(updatedCbs));
+        } catch (e) {
+          console.error(e);
+        }
       }
     } else {
       updatedGeneralAccounts = savingsAccounts.map((acc) => {
-        if (acc.memberId === req.memberId && acc.type === 'GS') {
+        if ((acc.memberId === req.memberId || acc.memberId === req.memberCode || acc.memberCode === req.memberCode || acc.memberId === targetMember.id) && (acc.type === 'GS' || !acc.type)) {
           const currentBal = acc.balance ?? 0;
-          const balanceDeduction = Math.max(0, returnAmt + adjustedAmt - profitAmt);
+          const balanceDeduction = req.status === 'Closing' ? currentBal : Math.max(0, returnAmt + adjustedAmt - profitAmt);
           return {
             ...acc,
             balance: Math.max(0, currentBal - balanceDeduction),
@@ -468,6 +725,14 @@ export const RealizedInformationView: React.FC<RealizedInformationViewProps> = (
         }
         return acc;
       });
+      if (onUpdateSavingsAccounts) {
+        onUpdateSavingsAccounts(updatedGeneralAccounts);
+        try {
+          localStorage.setItem(`tanzil_savings_accounts_${orgId}`, JSON.stringify(updatedGeneralAccounts));
+        } catch (e) {
+          console.error(e);
+        }
+      }
     }
 
     // 4. Prepare transactions
@@ -518,10 +783,27 @@ export const RealizedInformationView: React.FC<RealizedInformationViewProps> = (
       console.error(e);
     }
 
-    // 6. Push state updates
+    // 6. Push state updates and localStorage
     onUpdateMembers(updatedMembers);
+    try {
+      localStorage.setItem(`tanzil_group_members_${orgId}`, JSON.stringify(updatedMembers));
+    } catch (e) {
+      console.error(e);
+    }
+
     onUpdateSavingsAccounts(updatedGeneralAccounts);
+    try {
+      localStorage.setItem(`tanzil_savings_accounts_${orgId}`, JSON.stringify(updatedGeneralAccounts));
+    } catch (e) {
+      console.error(e);
+    }
+
     onUpdateTransactions(newTransactions);
+    try {
+      localStorage.setItem(`tanzil_transactions_${orgId}`, JSON.stringify(newTransactions));
+    } catch (e) {
+      console.error(e);
+    }
 
     setRefreshKey(prev => prev + 1);
     alert('সঞ্চয় ফেরত ও ঋণ সমন্বয় আবেদনটি সফলভাবে অনুমোদন করা হয়েছে!');
@@ -1230,17 +1512,19 @@ export const RealizedInformationView: React.FC<RealizedInformationViewProps> = (
                       />
                     </div>
 
-                    {/* Profit (লাভ) */}
+                    {/* Profit (লাভ) - Automatic & Non-Editable */}
                     <div className="relative">
-                      <label className="absolute top-0 left-3 -translate-y-1/2 bg-white px-1 text-[10px] font-black text-blue-600 uppercase tracking-wide">
-                        লাভ (Profit)
+                      <label className="absolute top-0 left-3 -translate-y-1/2 bg-white px-1 text-[10px] font-black text-emerald-700 uppercase tracking-wide flex items-center gap-1.5 z-10">
+                        <span>লাভ (Profit)</span>
+                        <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 lowercase tracking-normal">
+                          অটো হিসাবকৃত ({annualInterestRate}% বার্ষিক, {elapsedMonths} মাস)
+                        </span>
                       </label>
                       <input
                         type="number"
-                        placeholder="Enter profit amount"
-                        value={profit || ''}
-                        onChange={(e) => setProfit(Number(e.target.value) || 0)}
-                        className="w-full bg-white border border-blue-200 rounded-lg p-3 text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        readOnly
+                        value={profit}
+                        className="w-full bg-emerald-50/50 border border-emerald-300 rounded-lg p-3 text-xs font-black text-emerald-800 cursor-not-allowed font-mono shadow-inner focus:outline-none"
                       />
                     </div>
 
