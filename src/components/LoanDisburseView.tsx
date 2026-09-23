@@ -11,6 +11,7 @@ interface LoanDisburseViewProps {
   staff: Staff;
   defaultGroupId?: string;
   onSuccess: (updatedMembersList: Member[], txDetails: any) => void;
+  isReadOnly?: boolean;
 }
 
 export function LoanDisburseView({
@@ -21,7 +22,8 @@ export function LoanDisburseView({
   org,
   staff,
   defaultGroupId = '',
-  onSuccess
+  onSuccess,
+  isReadOnly = false
 }: LoanDisburseViewProps) {
   const [selectedGroupId, setSelectedGroupId] = useState(defaultGroupId);
   const [selectedProposalId, setSelectedProposalId] = useState('');
@@ -68,6 +70,10 @@ export function LoanDisburseView({
 
   const handleDisburseSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isReadOnly) {
+      alert('শাখা ব্যবস্থাপক (BM) হিসেবে ঋণ বিতরণ কার্যক্রমে তথ্য পরিবর্তন বা বিতরণ সম্পন্ন করতে পারবেন না। এটি রিড-অনলি মোডে রয়েছে।');
+      return;
+    }
     setErrorMsg(null);
 
     if (!selectedGroupId) {
@@ -160,6 +166,16 @@ export function LoanDisburseView({
       </div>
 
       <form onSubmit={handleDisburseSubmit} className="space-y-4">
+        {isReadOnly && (
+          <div className="p-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-xs font-bold flex items-center justify-between shadow-2xs">
+            <span className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+              শাখা ব্যবস্থাপক (BM) - রিড-অনলি মোড (শুধু বিতরণ তথ্য পরিদর্শন)
+            </span>
+            <span className="bg-amber-200 text-amber-900 text-[10px] px-2 py-0.5 rounded font-black">রিড-অনলি</span>
+          </div>
+        )}
+
         {errorMsg && (
           <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs sm:text-xs font-bold flex items-start gap-2 animate-in fade-in">
             <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
@@ -346,14 +362,16 @@ export function LoanDisburseView({
           </button>
           <button
             type="submit"
-            disabled={!selectedProposal}
-            className={`flex-1 py-3 text-white font-extrabold rounded-2xl text-xs shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-              selectedProposal
-                ? 'bg-emerald-600 hover:bg-emerald-700 hover:shadow-lg'
-                : 'bg-slate-300 border-slate-200 text-slate-400 cursor-not-allowed'
+            disabled={!selectedProposal || isReadOnly}
+            className={`flex-1 py-3 text-white font-extrabold rounded-2xl text-xs shadow-md transition-all flex items-center justify-center gap-1.5 ${
+              isReadOnly
+                ? 'bg-slate-300 text-slate-500 cursor-not-allowed border border-slate-300'
+                : selectedProposal
+                  ? 'bg-emerald-600 hover:bg-emerald-700 hover:shadow-lg cursor-pointer'
+                  : 'bg-slate-300 border-slate-200 text-slate-400 cursor-not-allowed'
             }`}
           >
-            <Wallet className="w-4 h-4" /> ঋণ বিতরণ নিশ্চিত করুন
+            <Wallet className="w-4 h-4" /> {isReadOnly ? 'বিতরণ নিশ্চিতকরণ নিষ্ক্রিয় (রিড-অনলি)' : 'ঋণ বিতরণ নিশ্চিত করুন'}
           </button>
         </div>
       </form>

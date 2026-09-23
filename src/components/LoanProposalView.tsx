@@ -561,6 +561,7 @@ interface LoanProposalViewProps {
   defaultGroupId?: string;
   onSuccess: () => void;
   holidays: Holiday[];
+  isReadOnly?: boolean;
 }
 
 export function LoanProposalView({
@@ -572,7 +573,8 @@ export function LoanProposalView({
   staff,
   defaultGroupId = '',
   onSuccess,
-  holidays
+  holidays,
+  isReadOnly = false
 }: LoanProposalViewProps) {
   const [selectedGroupId, setSelectedGroupId] = useState(defaultGroupId);
   const [selectedMemberId, setSelectedMemberId] = useState('');
@@ -743,6 +745,10 @@ export function LoanProposalView({
   // --- Save Proposal ---
   const handleSaveProposal = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isReadOnly) {
+      alert('শাখা ব্যবস্থাপক (BM) হিসেবে ঋণ প্রস্তাব সাবমিট করতে পারবেন না। এটি রিড-অনলি মোডে রয়েছে।');
+      return;
+    }
     setErrorMsg(null);
 
     if (!selectedGroupId) {
@@ -844,6 +850,16 @@ export function LoanProposalView({
       </div>
 
       <form onSubmit={handleSaveProposal} className="space-y-5">
+        {isReadOnly && (
+          <div className="p-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-xs font-bold flex items-center justify-between shadow-2xs">
+            <span className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+              শাখা ব্যবস্থাপক (BM) - রিড-অনলি মোড (শুধু প্রস্তাবনা পরিদর্শন)
+            </span>
+            <span className="bg-amber-200 text-amber-900 text-[10px] px-2 py-0.5 rounded font-black">রিড-অনলি</span>
+          </div>
+        )}
+
         {errorMsg && (
           <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs sm:text-xs font-bold flex items-start gap-2 animate-in fade-in">
             <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -1313,9 +1329,14 @@ export function LoanProposalView({
           </button>
           <button
             type="submit"
-            className="flex-1 py-3 bg-[#2f6ce5] hover:bg-[#1d59d1] text-white font-extrabold rounded-2xl text-xs shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer hover:shadow-lg"
+            disabled={isReadOnly}
+            className={`flex-1 py-3 font-extrabold rounded-2xl text-xs shadow-md transition-all flex items-center justify-center gap-1.5 ${
+              isReadOnly
+                ? 'bg-slate-300 text-slate-500 cursor-not-allowed border border-slate-300'
+                : 'bg-[#2f6ce5] hover:bg-[#1d59d1] text-white hover:shadow-lg cursor-pointer'
+            }`}
           >
-            <Save className="w-4 h-4" /> ঋণ প্রস্তাব সাবমিট করুন
+            <Save className="w-4 h-4" /> {isReadOnly ? 'প্রস্তাব সাবমিট নিষ্ক্রিয় (রিড-অনলি)' : 'ঋণ প্রস্তাব সাবমিট করুন'}
           </button>
         </div>
       </form>

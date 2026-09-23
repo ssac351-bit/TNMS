@@ -1206,6 +1206,10 @@ export default function BranchManagerDashboard({ org, staff, onLogout, isSimulat
   };
 
   const handleMemberAdmissionSuccess = (newMember: any) => {
+    if (isBM) {
+      alert('প্রতিষ্ঠানের নীতি অনুযায়ী শাখা ব্যবস্থাপক (BM) কোনো নতুন সদস্য ভর্তি করতে পারবেন না। এটি শুধুমাত্র মাঠ কর্মী (Field Officer / Staff)-দের এক্সেস।');
+      return;
+    }
     if (isRealBMReadOnly) {
       alert('শাখা ব্যবস্থাপক (BM) হিসেবে আপনি গ্রুপ কার্যক্রমের কোনো তথ্য পরিবর্তন করতে পারবেন না। এটি রিড-অনলি মুডে রয়েছে।');
       return;
@@ -1902,6 +1906,10 @@ export default function BranchManagerDashboard({ org, staff, onLogout, isSimulat
   };
 
   const handleSaveTransactions = (updatedMembersList: any[], txDetails: any) => {
+    if (isBM) {
+      alert('প্রতিষ্ঠানের নীতি অনুযায়ী শাখা ব্যবস্থাপক (BM) ডেলি কালেকশনে কোনো জমা বা উত্তোলন প্রদান করতে পারবেন না। এটি শুধুমাত্র মাঠ কর্মী (Field Worker / Staff)-দের দায়িত্ব।');
+      return;
+    }
     if (isRealBMReadOnly) {
       alert('শাখা ব্যবস্থাপক (BM) হিসেবে আপনি গ্রুপ কার্যক্রমের কোনো তথ্য পরিবর্তন করতে পারবেন না। এটি রিড-অনলি মুডে রয়েছে।');
       return;
@@ -1960,7 +1968,7 @@ export default function BranchManagerDashboard({ org, staff, onLogout, isSimulat
         amount: txDetails.netAmount,
         date: txDetails.date,
         addDate: txDetails.date,
-        description: `Daily collection (PL: ${txDetails.collections.pl}, GS: ${txDetails.collections.gs}, CBS: ${txDetails.collections.cbs}, LTS: ${txDetails.collections.lts})`,
+        description: `Daily collection (PL: ${txDetails.collections.pl}, GS: ${txDetails.collections.gs}, Share: ${txDetails.collections.share || 0}, CBS: ${txDetails.collections.cbs}, LTS: ${txDetails.collections.lts})`,
         collections: txDetails.collections,
         withdrawals: txDetails.withdrawals,
         exemption: 0, // Exemption is 0 here as it is pending BM approval
@@ -3720,6 +3728,10 @@ export default function BranchManagerDashboard({ org, staff, onLogout, isSimulat
                     <button
                       type="button"
                       onClick={() => {
+                        if (isBM) {
+                          alert('শাখা ব্যবস্থাপক (BM) কোনো সদস্যের ডেলি কালেকশনে জমা বা উত্তোলন/ফেরত প্রদান করতে পারবেন না। এটি মাঠ কর্মীর (Field Officer) দায়িত্ব।');
+                          return;
+                        }
                         setSelectedOperation('group_operation');
                         if (selectedGroupIdForSearch) {
                           setActiveCardView('member_transaction');
@@ -3742,6 +3754,10 @@ export default function BranchManagerDashboard({ org, staff, onLogout, isSimulat
                     <button
                       type="button"
                       onClick={() => {
+                        if (isBM) {
+                          alert('শাখা ব্যবস্থাপক (BM) কোনো সদস্যের সঞ্চয় ফেরত বা ডেলি কালেকশনে লেনদেন প্রদান করতে পারবেন না। এটি মাঠ কর্মীর দায়িত্ব।');
+                          return;
+                        }
                         setSelectedOperation('group_operation');
                         if (selectedGroupIdForSearch) {
                           setActiveCardView('realized_information');
@@ -3764,6 +3780,10 @@ export default function BranchManagerDashboard({ org, staff, onLogout, isSimulat
                     <button
                       type="button"
                       onClick={() => {
+                        if (isBM) {
+                          alert('শাখা ব্যবস্থাপক (BM) কোনো নতুন সদস্য ভর্তি করতে পারবেন না। এটি মাঠ কর্মীর (Field Officer) দায়িত্ব।');
+                          return;
+                        }
                         setSelectedOperation('group_operation');
                         setActiveCardView('member_admission');
                       }}
@@ -3837,6 +3857,10 @@ export default function BranchManagerDashboard({ org, staff, onLogout, isSimulat
                     <button
                       type="button"
                       onClick={() => {
+                        if (!isBM) {
+                          alert('কর্মী/মাঠ কর্মকর্তা হিসেবে শেয়ার ও লভ্যাংশ পরিচালনা করার অনুমতি আপনার নেই। এটি শাখা ব্যবস্থাপকের (BM) দায়িত্ব।');
+                          return;
+                        }
                         setSelectedOperation('group_operation');
                         setActiveCardView('share_management');
                       }}

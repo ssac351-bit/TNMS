@@ -47,6 +47,7 @@ interface MemberInformationViewProps {
   org?: any;
   staff?: any;
   workingDay?: string;
+  isReadOnly?: boolean;
 }
 
 export const MemberInformationView: React.FC<MemberInformationViewProps> = ({
@@ -64,7 +65,8 @@ export const MemberInformationView: React.FC<MemberInformationViewProps> = ({
   onLoanAction,
   org,
   staff,
-  workingDay
+  workingDay,
+  isReadOnly = false
 }) => {
   const calculateSavingsPayout = (
     type: string,
@@ -362,6 +364,10 @@ export const MemberInformationView: React.FC<MemberInformationViewProps> = ({
   };
 
   const saveStatusChange = (id: string) => {
+    if (isReadOnly) {
+      alert('শাখা ব্যবস্থাপক (BM) হিসেবে সদস্য স্ট্যাটাস পরিবর্তন করতে পারবেন না। এটি রিড-অনলি মোডে রয়েছে।');
+      return;
+    }
     const targetMember = groupMembers.find(m => m.id === id);
     if (tempStatus === 'inactive' && targetMember) {
       const plOut = targetMember.plOutstanding || 0;
@@ -400,6 +406,16 @@ export const MemberInformationView: React.FC<MemberInformationViewProps> = ({
         </div>
         <div className="w-7"></div>
       </div>
+
+      {isReadOnly && (
+        <div className="bg-amber-50 border-b border-amber-200 text-amber-900 px-4 py-2.5 text-xs font-bold flex items-center justify-between shadow-2xs">
+          <div className="flex items-center gap-1.5">
+            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+            <span>শাখা ব্যবস্থাপক (BM) - রিড-অনলি মোড (শুধু তথ্য পরিদর্শন)</span>
+          </div>
+          <span className="bg-amber-200 text-amber-900 text-[10px] px-2 py-0.5 rounded font-black">View Only</span>
+        </div>
+      )}
 
       {/* FILTER SEARCH BARS */}
       <div className="bg-white border-b border-slate-200 p-4 space-y-3 font-sans">
@@ -924,6 +940,10 @@ export const MemberInformationView: React.FC<MemberInformationViewProps> = ({
                               onClick={() => {
                                 if (!transferTargetGroupId) {
                                   alert("অনুগ্রহ করে একটি গন্তব্য সমিতি নির্বাচন করুন!");
+                                  return;
+                                }
+                                if (isReadOnly) {
+                                  alert('শাখা ব্যবস্থাপক (BM) হিসেবে সদস্য অন্য গ্রুপে স্থানান্তর করা যাবে না। এটি রিড-অনলি মোডে রয়েছে।');
                                   return;
                                 }
                                 if (onTransferMember) {

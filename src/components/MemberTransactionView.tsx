@@ -453,9 +453,11 @@ export const MemberTransactionView: React.FC<MemberTransactionViewProps> = ({
   const [gsCollection, setGsCollection] = useState('40');
   const [cbsCollection, setCbsCollection] = useState('10');
   const [ltsCollection, setLtsCollection] = useState('0');
+  const [shareCollection, setShareCollection] = useState('0');
 
   const [gsWithdrawal, setGsWithdrawal] = useState('0');
   const [cbsWithdrawal, setCbsWithdrawal] = useState('0');
+  const [shareWithdrawal, setShareWithdrawal] = useState('0');
 
   const [isPlExempted, setIsPlExempted] = useState(false);
   const [plExemptionAmount, setPlExemptionAmount] = useState('970');
@@ -512,8 +514,10 @@ export const MemberTransactionView: React.FC<MemberTransactionViewProps> = ({
         setGsCollection(String(existingTx.collections?.gs ?? 0));
         setCbsCollection(String(existingTx.collections?.cbs ?? 0));
         setLtsCollection(String(existingTx.collections?.lts ?? 0));
+        setShareCollection(String(existingTx.collections?.share ?? 0));
         setGsWithdrawal(String(existingTx.withdrawals?.gs ?? 0));
         setCbsWithdrawal(String(existingTx.withdrawals?.cbs ?? 0));
+        setShareWithdrawal(String(existingTx.withdrawals?.share ?? 0));
         setIsPlExempted(existingTx.exemption > 0);
         setPlExemptionAmount(String(existingTx.exemption || (currentMember.plOutstanding ?? 0)));
         setExemptionReason(existingTx.exemptionReason || 'member_death');
@@ -605,9 +609,11 @@ export const MemberTransactionView: React.FC<MemberTransactionViewProps> = ({
         setGsCollection(String(defaultGS_Inst));
         setCbsCollection(String(defaultCBS_Inst));
         setLtsCollection('0'); // Default Collection for LTS is usually 0 unless paid
+        setShareCollection('0');
 
         setGsWithdrawal('0');
         setCbsWithdrawal('0');
+        setShareWithdrawal('0');
         setIsPlExempted(false);
         setPlExemptionAmount(String(currentMember.plOutstanding ?? 0));
         setExemptionReason('member_death');
@@ -661,15 +667,18 @@ export const MemberTransactionView: React.FC<MemberTransactionViewProps> = ({
     (acc) => (acc.memberId === currentMember.id || acc.memberCode === currentMember.memberId) && acc.status === 'active'
   ) : null;
 
+  const shareUnitPrice = Number((org as any)?.sharePrice || 10);
   const rawGsBalance = activeGsAccount ? Number(activeGsAccount.balance ?? 0) : (currentMember?.gsBalance ?? currentMember?.savingsBalance ?? 0);
   const rawCbsBalance = activeCbsAccount ? Number(activeCbsAccount.balance ?? 0) : (currentMember?.cbsBalance ?? 0);
   const rawLtsBalance = activeLtsAccount ? Number(activeLtsAccount.balance ?? 0) : (currentMember?.ltsBalance ?? 0);
+  const rawShareBalance = Number(currentMember?.shareBalance ?? ((currentMember?.shareCount ?? 1) * shareUnitPrice));
 
   // Saved current balances (Actual state in DB/State)
   const currentPlOutstanding = currentMember ? (currentMember.plOutstanding ?? 0) : 0;
   const currentGsBalance = rawGsBalance;
   const currentCbsBalance = rawCbsBalance;
   const currentLtsBalance = rawLtsBalance;
+  const currentShareBalance = rawShareBalance;
 
   // Restore pre-transaction base values (baseline before today's saved transaction, if any)
   const basePlOutstanding = currentMember ? (currentPlOutstanding + (existingTx ? (existingTx.collections?.pl ?? 0) : 0)) : 0;
@@ -684,38 +693,46 @@ export const MemberTransactionView: React.FC<MemberTransactionViewProps> = ({
   const baseGsBalance = currentMember ? Math.max(0, currentGsBalance - (existingTx ? (existingTx.collections?.gs ?? 0) : 0) + (existingTx ? (existingTx.withdrawals?.gs ?? 0) : 0)) : 0;
   const baseGsInstallment = currentMember?.gsInstallment ?? (baseGsBalance > 0 ? 40 : 0);
 
+  const baseShareBalance = currentMember ? Math.max(0, currentShareBalance - (existingTx ? (existingTx.collections?.share ?? 0) : 0) + (existingTx ? (existingTx.withdrawals?.share ?? 0) : 0)) : 0;
+
   // Real-time Net Amount calculations: Daily Collections - Daily Withdrawals
   const colPL = Number(plCollection) || 0;
   const colGS = Number(gsCollection) || 0;
   const colCBS = Number(cbsCollection) || 0;
   const colLTS = Number(ltsCollection) || 0;
+  const colShare = Number(shareCollection) || 0;
 
   const wthGS = Number(gsWithdrawal) || 0;
   const wthCBS = Number(cbsWithdrawal) || 0;
+  const wthShare = Number(shareWithdrawal) || 0;
 
   const colCBS_effective = cbsAlreadyDeposited ? 0 : colCBS;
-  const netAmount = (colPL + colGS + colCBS_effective + colLTS) - (wthGS + wthCBS);
+  const netAmount = (colPL + colGS + colCBS_effective + colLTS + colShare) - (wthGS + wthCBS + wthShare);
 
   // Proposed/effective balances based on current form inputs (used upon save)
   const effectivePlOutstanding = Math.max(0, basePlOutstanding - colPL);
   const effectiveGsBalance = Math.max(0, baseGsBalance + colGS - wthGS);
   const effectiveCbsBalance = Math.max(0, baseCbsBalance + colCBS_effective - wthCBS);
   const effectiveLtsBalance = baseLtsBalance + colLTS;
+  const effectiveShareBalance = Math.max(0, baseShareBalance + colShare - wthShare);
 
-  // Current recorded balances to display on the screen (does NOT prematurely change before saving)
-  const plOutstanding = basePlOutstanding;
+  // Current recorded balances to display on the screen (reflecting current form input and saved transactions)
+  const plOutstanding = effectivePlOutstanding;
   const plInstallment = basePlInstallment;
-  const cbsBalance = baseCbsBalance;
+  const cbsBalance = effectiveCbsBalance;
   const cbsInstallment = baseCbsInstallment;
-  const ltsBalance = baseLtsBalance;
+  const ltsBalance = effectiveLtsBalance;
   const ltsInstallment = baseLtsInstallment;
-  const gsBalance = baseGsBalance;
+  const gsBalance = effectiveGsBalance;
   const gsInstallment = baseGsInstallment;
+  const shareBalance = effectiveShareBalance;
+  const shareCount = Math.max(0, Math.round(shareBalance / shareUnitPrice));
 
   const hasPl = (currentPlOutstanding > 0 || basePlOutstanding > 0);
   const hasCbs = (currentCbsBalance > 0 || baseCbsBalance > 0 || !!activeCbsAccount);
   const hasLts = (currentLtsBalance > 0 || baseLtsBalance > 0 || !!activeLtsAccount);
   const hasGs = (currentGsBalance > 0 || baseGsBalance > 0 || !!activeGsAccount || true);
+  const hasShare = true;
 
   const mSavings = currentMember ? savingsAccounts.filter(
     (acc) => (acc.memberId === currentMember.id || acc.memberId === currentMember.memberId || acc.memberCode === currentMember.memberId) && acc.status === 'active'
@@ -906,8 +923,15 @@ export const MemberTransactionView: React.FC<MemberTransactionViewProps> = ({
     setSelectedMemberIndex(idx);
   };
 
+  const isBM = staff?.designation === 'শাখা ব্যবস্থাপক' || staff?.designation === 'Branch Manager' || staff?.designation === 'BM';
+
   const handleSave = () => {
     if (!currentMember) return;
+
+    if (isBM) {
+      alert("শাখা ব্যবস্থাপক (BM) ডেলি কালেকশনে কোনো জমা বা উত্তোলন ফেরত দিতে পারবেন না। এটি শুধুমাত্র মাঠ কর্মকর্তা (Field Worker / ILO)-দের দায়িত্ব।");
+      return;
+    }
 
     if (txDate < workingDay) {
       alert("পূর্বের দিনের লেনদেন আপডেট করা সম্ভব নয়!");
@@ -934,6 +958,8 @@ export const MemberTransactionView: React.FC<MemberTransactionViewProps> = ({
       savingsBalance: Math.max(0, baseGsBalance + colGS - wthGS), // Keep in sync for other components
       cbsBalance: Math.max(0, baseCbsBalance + colCBS_effective - wthCBS),
       ltsBalance: baseLtsBalance + colLTS,
+      shareBalance: Math.max(0, baseShareBalance + colShare - wthShare),
+      shareCount: Math.max(0, Math.round(Math.max(0, baseShareBalance + colShare - wthShare) / shareUnitPrice)),
       
       // Status and inactive reason remain unchanged, to be processed upon BM Approval
       status: currentMember.status,
@@ -962,10 +988,12 @@ export const MemberTransactionView: React.FC<MemberTransactionViewProps> = ({
         gs: colGS,
         cbs: colCBS_effective,
         lts: colLTS,
+        share: colShare,
       },
       withdrawals: {
         gs: wthGS,
         cbs: wthCBS,
+        share: wthShare,
       },
       exemption: exemptionVal,
       exemptionReason: isPlExempted ? exemptionReason : undefined
@@ -1247,6 +1275,14 @@ export const MemberTransactionView: React.FC<MemberTransactionViewProps> = ({
                 </span>
               </div>
             )}
+            {hasShare && (
+              <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                <span className="text-indigo-950 font-black">Share (শেয়ার মূলধন)</span>
+                <span className="font-mono text-indigo-700 font-black text-sm">
+                  ৳ {shareBalance} <span className="text-slate-400 text-[10.5px] font-medium">({shareCount} টি)</span>
+                </span>
+              </div>
+            )}
             {hasCbs && (
               <div className="flex justify-between items-center py-2 border-b border-slate-100">
                 <span className="text-slate-500 font-medium">CBS (ডাবল সঞ্চয়)</span>
@@ -1311,6 +1347,27 @@ export const MemberTransactionView: React.FC<MemberTransactionViewProps> = ({
                       type="text"
                       value={gsCollection}
                       onChange={(e) => setGsCollection(e.target.value.replace(/\D/g, ''))}
+                      className="w-24 bg-white border-b-2 border-indigo-400 font-black text-right text-sm px-1.5 py-0.5 outline-none font-mono focus:border-indigo-600 text-slate-850"
+                    />
+                    <div className="w-5 h-5 bg-emerald-600 rounded-full flex items-center justify-center shrink-0">
+                      <Check className="w-3.5 h-3.5 text-white" />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Share Input */}
+              {hasShare && (
+                <div className="bg-[#dbeafe]/70 p-2.5 rounded-lg border border-indigo-100 flex items-center justify-between gap-3">
+                  <div className="flex flex-col text-slate-700 select-none">
+                    <span className="font-extrabold text-indigo-900 text-xs font-sans">Share (শেয়ার জমা)</span>
+                    <span className="text-[10px] text-slate-500 font-bold mt-0.5">মূলধন: ৳{shareBalance} ({shareCount} টি)</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-1 justify-end">
+                    <input
+                      type="text"
+                      value={shareCollection}
+                      onChange={(e) => setShareCollection(e.target.value.replace(/\D/g, ''))}
                       className="w-24 bg-white border-b-2 border-indigo-400 font-black text-right text-sm px-1.5 py-0.5 outline-none font-mono focus:border-indigo-600 text-slate-850"
                     />
                     <div className="w-5 h-5 bg-emerald-600 rounded-full flex items-center justify-center shrink-0">
@@ -1432,6 +1489,21 @@ export const MemberTransactionView: React.FC<MemberTransactionViewProps> = ({
                   </div>
                 </div>
               )}
+
+              {/* Share Withdrawal / Refund */}
+              {hasShare && (
+                <div className="bg-[#eaeef6] p-2.5 rounded-lg border border-slate-200 flex items-center justify-between gap-3">
+                  <span className="font-extrabold text-slate-700 text-xs min-w-[3.5rem]">Share (ফেরত)</span>
+                  <div className="flex items-center gap-1.5 flex-1 justify-end">
+                    <input
+                      type="text"
+                      value={shareWithdrawal}
+                      onChange={(e) => setShareWithdrawal(e.target.value.replace(/\D/g, ''))}
+                      className="w-24 bg-white border-b border-rose-400 font-black text-right text-sm px-1.5 py-0.5 outline-none font-mono focus:border-rose-600 text-slate-850"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1485,6 +1557,16 @@ export const MemberTransactionView: React.FC<MemberTransactionViewProps> = ({
 
       </div>
 
+      {/* BM Policy Restriction Warning Banner */}
+      {isBM && (
+        <div className="mx-4 mb-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 font-bold text-[11px] leading-relaxed flex items-start gap-2">
+          <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+          <span>
+            <strong>শাখা ব্যবস্থাপক (BM) নোটিশ:</strong> প্রতিষ্ঠানের নীতিমালা অনুযায়ী শাখা ব্যবস্থাপক (BM) কোনো সদস্য ভর্তি বা ডেলি কালেকশনে জমা/উত্তোলন প্রদান করতে পারবেন না। এটি শুধুমাত্র মাঠ কর্মী (ILO/FO)-দের জন্য প্রযোজ্য।
+          </span>
+        </div>
+      )}
+
       {/* 10. ACTION FOOTER BUTTONS */}
       <div className="p-4 bg-white border-t border-slate-200 flex gap-4">
         <button
@@ -1498,10 +1580,14 @@ export const MemberTransactionView: React.FC<MemberTransactionViewProps> = ({
         <button
           type="button"
           onClick={handleSave}
-          className="flex-1 py-3 bg-[#2f6ce5] hover:bg-[#1d59d1] text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md hover:shadow-lg select-none cursor-pointer active:scale-95 transition"
+          className={`flex-1 py-3 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md select-none transition ${
+            isBM
+              ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+              : 'bg-[#2f6ce5] hover:bg-[#1d59d1] text-white hover:shadow-lg cursor-pointer active:scale-95'
+          }`}
         >
           <Save className="w-4 h-4" />
-          Save
+          {isBM ? 'BM সংরক্ষিত (No Entry)' : 'Save'}
         </button>
       </div>
 

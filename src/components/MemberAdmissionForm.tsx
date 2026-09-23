@@ -130,6 +130,13 @@ export const MemberAdmissionForm: React.FC<MemberAdmissionFormProps> = ({
     e.preventDefault();
     setFormError(null);
 
+    // Role permission check: BM cannot perform member admission
+    const isBM = staff?.designation === 'শাখা ব্যবস্থাপক' || staff?.designation === 'Branch Manager' || staff?.designation === 'BM';
+    if (isBM) {
+      setFormError('শাখা ব্যবস্থাপক (BM) কোনো সদস্য ভর্তি করতে পারবেন না। এটি মাঠ কর্মীর (Field Officer) দায়িত্ব।');
+      return;
+    }
+
     // Form Valdiation
     if (!name.trim()) return setFormError('সদস্যের নাম আবশ্যক!');
     if (!phone.trim() || phone.trim().length !== 11) return setFormError('সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন!');
