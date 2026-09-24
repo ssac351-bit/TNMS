@@ -272,7 +272,11 @@ export const RealizedInformationView: React.FC<RealizedInformationViewProps> = (
     if (prod.includes('cbs')) {
       return currentSavingsAccount?.interestRate || getStoredRate('sav_profit_cbs', 8.5);
     }
-    return currentSavingsAccount?.interestRate || getStoredRate('sav_profit_gs', 6.0);
+    const configuredGsRate = getStoredRate('sav_profit_gs', 6.0);
+    if (currentSavingsAccount?.interestRate && currentSavingsAccount.interestRate !== 7.5) {
+      return currentSavingsAccount.interestRate;
+    }
+    return configuredGsRate;
   }, [productName, status, currentSavingsAccount, orgId]);
 
   // Elapsed months between openingDate and returnDate (or adjustDate/workingDay)
@@ -1310,9 +1314,9 @@ export const RealizedInformationView: React.FC<RealizedInformationViewProps> = (
                       </label>
                       <input
                         type="text"
+                        disabled
                         value={openingDate}
-                        onChange={(e) => setOpeningDate(e.target.value)}
-                        className="w-full bg-white border border-slate-200 rounded-lg p-3 text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs font-bold text-slate-500 cursor-not-allowed"
                       />
                     </div>
 

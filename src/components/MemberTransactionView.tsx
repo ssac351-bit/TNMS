@@ -1660,7 +1660,7 @@ export const MemberTransactionView: React.FC<MemberTransactionViewProps> = ({
                 <div className={`p-2.5 rounded-lg border ${cbsAlreadyDeposited ? 'bg-amber-50/50 border-amber-200' : 'bg-[#dbeafe]/70 border-indigo-100'} flex items-center justify-between gap-3`}>
                   <div className="flex flex-col text-slate-700 select-none">
                     <div className="flex items-center gap-1">
-                      <span className="font-extrabold text-indigo-900 text-xs font-sans">CBS (সিবিএস)</span>
+                      <span className="font-extrabold text-indigo-900 text-xs font-sans">মূলধন সঞ্চয় (CBS)</span>
                       {cbsAlreadyDeposited && (
                         <span className="bg-amber-100 text-amber-850 text-[8.5px] font-black px-1 py-0.5 rounded uppercase font-sans">
                           {isCbsWeekly ? 'সাপ্তাহিক ১ বার জমা সম্পূর্ণ' : 'মাসিক ১ বার জমা সম্পূর্ণ'}
@@ -1870,7 +1870,7 @@ export const MemberTransactionView: React.FC<MemberTransactionViewProps> = ({
       </div>
 
       {selectedStatement && (
-        <div className="absolute inset-0 bg-[#f4f6f9] z-50 flex flex-col animate-in slide-in-from-right duration-200">
+        <div className="fixed inset-0 bg-[#f4f6f9] z-[100] flex flex-col animate-in slide-in-from-right duration-200">
           {/* Statement Header */}
           <div className="bg-[#1e40af] text-white px-5 py-4 flex items-center justify-between">
             <button

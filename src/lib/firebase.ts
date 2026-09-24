@@ -9,11 +9,12 @@ const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 // Initialize Authentication
 export const auth = getAuth(app);
 
-// Initialize Cloud Firestore database using configured databaseId with local offline cache
+// Initialize Cloud Firestore database using configured databaseId with local offline cache and resilient long-polling
 let dbInstance;
 try {
   dbInstance = initializeFirestore(app, {
-    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+    experimentalAutoDetectLongPolling: true,
   }, firebaseConfig.firestoreDatabaseId);
 } catch {
   // If already initialized or unsupported in current environment, get existing instance

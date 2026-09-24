@@ -46,7 +46,7 @@ export const AddSavingsAccountForm: React.FC<AddSavingsAccountFormProps> = ({
 
   // Read admission fee and rates from organization configurations
   const admissionFeeStr = org ? localStorage.getItem(`tanzil_sav_admission_fee_${org.id}`) || '১০০' : '১০০';
-  const gsProfitRateStr = org ? localStorage.getItem(`tanzil_sav_profit_gs_${org.id}`) || '৭.৫' : '৭.৫';
+  const gsProfitRateStr = org ? localStorage.getItem(`tanzil_sav_profit_gs_${org.id}`) || '৬' : '৬';
   const fdrProfitConfigRateStr = org ? localStorage.getItem(`tanzil_sav_profit_fdr_${org.id}`) || '১০' : '১০';
 
   // Filter active members in group

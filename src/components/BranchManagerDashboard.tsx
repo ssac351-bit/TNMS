@@ -1230,7 +1230,17 @@ export default function BranchManagerDashboard({ org, staff, onLogout, isSimulat
       type: 'GS',
       initialDeposit: depositAmount,
       balance: depositAmount,
-      interestRate: 7.5,
+      interestRate: (() => {
+        try {
+          const saved = localStorage.getItem(`tanzil_sav_profit_gs_${org?.id || ''}`);
+          if (saved) {
+            const eng = saved.replace(/[০-৯]/g, (d: string) => String.fromCharCode(d.charCodeAt(0) - 2406 + 48));
+            const p = parseFloat(eng);
+            if (!isNaN(p)) return p;
+          }
+        } catch (e) {}
+        return 6;
+      })(),
       termMonths: null,
       admissionFee: 0,
       date: newMember.admissionDate || new Date().toISOString().split('T')[0],
@@ -3899,7 +3909,23 @@ export default function BranchManagerDashboard({ org, staff, onLogout, isSimulat
                       </div>
                     </button>
 
-                    {/* 7. Export Data */}
+                    {/* 8. Transaction Summary (লেনদেন সামারী) */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedOperation('transaction_summary');
+                      }}
+                      className="flex flex-col rounded-2xl overflow-hidden transition-all duration-200 cursor-pointer active:scale-95 group border border-emerald-200 hover:border-emerald-400 hover:shadow-xl shadow-[0_4px_12px_rgba(0,0,0,0.1)] bg-white h-44 sm:h-48"
+                    >
+                      <div className="bg-emerald-600 py-5 sm:py-6 flex items-center justify-center w-full transition-colors group-hover:bg-emerald-700">
+                        <BookOpen className="w-10 h-10 sm:w-11 sm:h-11 text-white stroke-[1.5]" />
+                      </div>
+                      <div className="bg-[#eaeaea] flex-1 px-3 flex items-center justify-center text-slate-800 font-extrabold text-sm sm:text-base leading-tight">
+                        Transaction Summary (লেনদেন সামারী)
+                      </div>
+                    </button>
+
+                    {/* 9. Export Data */}
                     <button
                       type="button"
                       onClick={() => {
@@ -3915,7 +3941,7 @@ export default function BranchManagerDashboard({ org, staff, onLogout, isSimulat
                       </div>
                     </button>
 
-                    {/* 8. Export Online */}
+                    {/* 10. Export Online */}
                     <button
                       type="button"
                       onClick={() => {
@@ -4652,7 +4678,7 @@ export default function BranchManagerDashboard({ org, staff, onLogout, isSimulat
                             { id: 'add_lts_account', label: 'দীঘমেয়াদী সঞ্চয় হিসাব', englishLabel: 'Add LTS Account', desc: 'নতুন ডিপিএস বা এফডিআর খতিয়ান বুকিং করুন।', icon: Coins, active: true, color: 'bg-cyan-50 text-cyan-700 border-cyan-100 hover:border-cyan-500' },
                             { id: 'loan_disburse', label: 'ঋণ বিতরণ ও খাতা পোস্টিং', englishLabel: 'Loan Disbursement', desc: 'অনুমোদিত ঋণের চেক বা ক্যাশ বিতরণ ফরম।', icon: HandCoins, active: true, color: 'bg-indigo-50 text-indigo-700 border-indigo-100 hover:border-indigo-500' },
                             { id: 'loan_proposal', label: 'নতুন ঋণ প্রস্তাব ফরম', englishLabel: 'Loan Proposal', desc: 'মাঠ থেকে নেওয়া ঋণের প্রস্তাব বা আবেদন ফরম।', icon: ClipboardList, active: true, color: 'bg-teal-50 text-teal-700 border-teal-100 hover:border-teal-500' },
-                            { id: 'add_cbs_account', label: 'বিশেষ সঞ্চয় হিসাব বুকিং', englishLabel: 'Add CBS Account', desc: 'নতুন বিশেষ মেয়াদ উত্তীর্ণ সঞ্চয় স্কিম চালু করুন।', icon: PiggyBank, active: true, color: 'bg-rose-50 text-rose-700 border-rose-100 hover:border-rose-500' },
+                            { id: 'add_cbs_account', label: 'মূলধন সঞ্চয় (CBS) হিসাব বুকিং', englishLabel: 'Add CBS Account', desc: 'সদস্যের মূলধন সঞ্চয় স্কিম (CBS) খাতা চালু করুন।', icon: PiggyBank, active: true, color: 'bg-rose-50 text-rose-700 border-rose-100 hover:border-rose-500' },
                             { id: 'add_savings_account', label: 'সাধারণ সঞ্চয় হিসাব খুলুন', englishLabel: 'Add GS Account', desc: 'নতুন সাধারণ সঞ্চয় খাতা বা সঞ্চয় বিধি সেটআপ।', icon: DollarSign, active: true, color: 'bg-amber-50 text-amber-700 border-amber-100 hover:border-amber-500' },
                             { id: 'share_management', label: 'সমবায় শেয়ার ও লভ্যাংশ', englishLabel: 'Share & Dividend', desc: 'সদস্যদের শেয়ার মূলধন ও লভ্যাংশ হিসাব।', icon: ShieldCheck, active: true, color: 'bg-emerald-50 text-emerald-700 border-emerald-100 hover:border-emerald-500' },
                             { id: 'batch_defaulter_adjustment', label: 'সকল খেলাপির অটো ঋণ সমন্বয়', englishLabel: 'Batch Defaulter Settlement', desc: 'সকল খেলাপি সদস্যের সঞ্চয় হতে পর্যায়ক্রমিক লোন সমন্বয়।', icon: Zap, active: true, color: 'bg-rose-100 text-rose-800 border-rose-200 hover:border-rose-600' }
